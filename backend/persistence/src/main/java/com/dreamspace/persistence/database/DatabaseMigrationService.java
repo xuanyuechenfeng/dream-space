@@ -10,7 +10,7 @@ import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.stereotype.Service;
 
 @Service
-public final class DatabaseMigrationService {
+public class DatabaseMigrationService {
   private final DataSource dataSource;
   public DatabaseMigrationService(DataSource dataSource) { this.dataSource = dataSource; }
 

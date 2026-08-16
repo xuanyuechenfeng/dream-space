@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.dreamspace.persistence.storage.LocalObjectStorage;
 import com.dreamspace.persistence.storage.ObjectStorage;
 import com.dreamspace.persistence.storage.S3ObjectStorage;
+import com.dreamspace.persistence.storage.ObjectStorageFactory;
 import java.net.URI;
 import java.nio.file.Path;
 import org.mybatis.spring.boot.autoconfigure.ConfigurationCustomizer;
@@ -13,6 +14,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -24,9 +26,9 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 @MapperScan("com.dreamspace.persistence")
 @EnableConfigurationProperties(DreamSpaceProperties.class)
 public class PersistenceConfiguration {
-  public PersistenceConfiguration(ObjectMapper objectMapper) {
-    // Keep ObjectMapper creation in the application modules; handlers use the shared bean.
-  }
+  @Bean
+  @ConditionalOnMissingBean(ObjectMapper.class)
+  ObjectMapper persistenceObjectMapper() { return new ObjectMapper(); }
 
   @Bean
   ConfigurationCustomizer myBatisConfigurationCustomizer(ObjectMapper objectMapper) {
@@ -58,11 +60,17 @@ public class PersistenceConfiguration {
   }
 
   @Bean
+  @Primary
   @ConditionalOnMissingBean(ObjectStorage.class)
   @ConditionalOnProperty(prefix = "dream-space.storage", name = "mode", havingValue = "local", matchIfMissing = true)
   ObjectStorage localObjectStorage(DreamSpaceProperties properties) {
     String directory = properties.storage().localDirectory();
     return new LocalObjectStorage(Path.of(directory == null || directory.isBlank() ? "./var/objects" : directory));
+  }
+
+  @Bean
+  ObjectStorageFactory objectStorageFactory(ObjectStorage storage) {
+    return new ObjectStorageFactory(storage);
   }
 
   @Bean

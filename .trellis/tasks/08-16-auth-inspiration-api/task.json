@@ -3,7 +3,7 @@
   "name": "auth-inspiration-api",
   "title": "Implement authentication and inspiration APIs",
   "description": "Implement user/admin authentication, RBAC, inspiration APIs, and upload contracts.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": "backend/api auth, admin auth/RBAC, published inspiration reads, reference uploads, and contract tests",
   "package": null,
