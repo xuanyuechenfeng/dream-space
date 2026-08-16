@@ -3,7 +3,7 @@
   "name": "web-parity",
   "title": "Implement web visual shell and public flows",
   "description": "Port user-facing layout, themes, inspiration, and login behavior with bak parity.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": "frontend/web shell, inspiration/login parity, stores, tokens, assets, responsive and visual tests",
   "package": null,
