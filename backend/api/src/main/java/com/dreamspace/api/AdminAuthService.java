@@ -20,8 +20,8 @@ public class AdminAuthService {
   public CodeResponse sendCode(CodeRequest request) {
     String phone = AuthService.normalizePhone(request == null ? null : request.phone());
     if (mapper.findActiveByPhone(phone) == null) throw new ApiException(HttpStatus.UNAUTHORIZED, "ADMIN_UNAUTHORIZED", "管理员账号不可用");
-    AdminVerificationCodeRecord active = mapper.findActiveCode(phone); if (active != null) return new CodeResponse(active.id(), active.expiresAt(), 60, "123456");
-    String id = UUID.randomUUID().toString(); Instant exp = Instant.now().plusSeconds(props.auth().codeTtlSeconds()); mapper.insertCode(id, phone, AuthService.hash(id + ":123456"), exp); return new CodeResponse(id, exp, 60, "123456");
+    AdminVerificationCodeRecord active = mapper.findActiveCode(phone); if (active != null) return new CodeResponse(active.id(), active.expiresAt(), 60, demoCode());
+    String id = UUID.randomUUID().toString(); Instant exp = Instant.now().plusSeconds(props.auth().codeTtlSeconds()); mapper.insertCode(id, phone, AuthService.hash(id + ":123456"), exp); return new CodeResponse(id, exp, 60, demoCode());
   }
   @Transactional
   public Result login(LoginRequest request) {
@@ -36,4 +36,5 @@ public class AdminAuthService {
   public void logout(String token) { if (token != null) mapper.deleteSession(AuthService.hash(token)); }
   public record Result(SessionResponse response, String token, Instant expiresAt) {}
   private AdminView view(AdminUserRecord a) { return new AdminView(a.id(), a.phone().substring(0, 3) + "****" + a.phone().substring(a.phone().length() - 4), a.displayName(), a.role().name()); }
+  private String demoCode() { return "mock".equalsIgnoreCase(props.externalServicesMode()) ? "123456" : null; }
 }

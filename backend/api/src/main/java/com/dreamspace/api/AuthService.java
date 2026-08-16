@@ -30,9 +30,9 @@ public class AuthService {
   public CodeResponse sendCode(CodeRequest input) {
     String phone = normalizePhone(input == null ? null : input.phone());
     VerificationCodeRecord reusable = mapper.findActiveCode(phone);
-    if (reusable != null) return new CodeResponse(reusable.id(), reusable.expiresAt(), 60, "123456");
+    if (reusable != null) return new CodeResponse(reusable.id(), reusable.expiresAt(), 60, demoCode());
     String id = UUID.randomUUID().toString(); Instant expires = Instant.now().plusSeconds(properties.auth().codeTtlSeconds());
-    mapper.insertCode(id, phone, hash(id + ":123456"), expires); return new CodeResponse(id, expires, 60, "123456");
+    mapper.insertCode(id, phone, hash(id + ":123456"), expires); return new CodeResponse(id, expires, 60, demoCode());
   }
   @Transactional
   public SessionResult login(LoginRequest input) {
@@ -41,8 +41,9 @@ public class AuthService {
       throw new ApiException(HttpStatus.BAD_REQUEST, "AUTH_AGREEMENT_REQUIRED", "请先同意全部协议");
     if (input.challengeId() == null || input.code() == null || !input.code().matches("\\d{6}")) throw new ApiException(HttpStatus.BAD_REQUEST, "AUTH_CODE_INVALID", "验证码无效");
     VerificationCodeRecord challenge = mapper.findCodeById(input.challengeId());
-    if (challenge == null || !phone.equals(challenge.phone()) || challenge.consumedAt() != null || challenge.expiresAt().isBefore(Instant.now()) || challenge.attempts() >= 5)
+    if (challenge == null || !phone.equals(challenge.phone()) || challenge.consumedAt() != null || challenge.attempts() >= 5)
       throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_CODE_INVALID", "验证码错误或已过期");
+    if (challenge.expiresAt().isBefore(Instant.now())) throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_CODE_EXPIRED", "验证码已过期");
     if (!constantEquals(challenge.codeHash(), hash(challenge.id() + ":" + input.code()))) { mapper.incrementAttempts(challenge.id()); throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_CODE_INVALID", "验证码错误或已过期"); }
     if (mapper.consumeCode(challenge.id()) != 1) throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_CODE_INVALID", "验证码错误或已过期");
     String userId = mapper.findUserIdByPhone(phone); if (userId == null) userId = UUID.randomUUID().toString(); mapper.upsertUser(userId, phone); userId = mapper.findUserIdByPhone(phone);
@@ -59,4 +60,5 @@ public class AuthService {
   private static boolean constantEquals(String a, String b) { return MessageDigest.isEqual(a.getBytes(StandardCharsets.UTF_8), b.getBytes(StandardCharsets.UTF_8)); }
   private static String randomToken() { byte[] b = new byte[32]; RANDOM.nextBytes(b); return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(b); }
   private static String mask(String p) { return p.substring(0, 3) + "****" + p.substring(p.length() - 4); }
+  private String demoCode() { return "mock".equalsIgnoreCase(properties.externalServicesMode()) ? "123456" : null; }
 }

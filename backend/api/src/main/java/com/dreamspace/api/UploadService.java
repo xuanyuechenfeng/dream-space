@@ -5,6 +5,7 @@ import com.dreamspace.persistence.storage.ObjectStorageFactory;
 import com.dreamspace.persistence.upload.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -27,12 +28,37 @@ public class UploadService {
     byte[] data; try { data = file.getBytes(); } catch (IOException e) { throw bad("UPLOAD_INVALID", "参考图读取失败"); }
     if (!magic(data, mime)) throw bad("UPLOAD_MAGIC_INVALID", "文件内容与类型不一致");
     BufferedImage image; try { image = ImageIO.read(new ByteArrayInputStream(data)); } catch (IOException e) { throw bad("UPLOAD_INVALID", "参考图已损坏"); }
-    if (image == null) throw bad("UPLOAD_INVALID", "参考图已损坏"); long pixels = (long) image.getWidth() * image.getHeight(); if (pixels > MAX_PIXELS) throw bad("UPLOAD_DIMENSIONS_INVALID", "图片像素超过限制");
-    String id = UUID.randomUUID().toString(), key = "references/" + userId + "/" + id + ".webp"; ObjectStorage storage = storageFactory.selected(); storage.put(key, data, "image/webp");
-    try { String filename = java.nio.file.Paths.get(file.getOriginalFilename() == null ? "reference" : file.getOriginalFilename()).getFileName().toString(); String sum = HexFormat.of().formatHex(sha(data)); ReferenceUploadRecord rec = new ReferenceUploadRecord(id, userId, key, filename, "image/webp", data.length, image.getWidth(), image.getHeight(), sum, null, null); mapper.insert(rec); return new Response(id, "/uploads/references/" + id + "/content", filename, "image/webp", image.getWidth(), image.getHeight(), data.length, sum); } catch (RuntimeException e) { storage.delete(key); throw e; }
+    int width = image == null ? webpWidth(data) : image.getWidth(), height = image == null ? webpHeight(data) : image.getHeight();
+    if (width <= 0 || height <= 0) throw bad("UPLOAD_INVALID", "参考图已损坏"); long pixels = (long) width * height; if (pixels > MAX_PIXELS) throw bad("UPLOAD_DIMENSIONS_INVALID", "图片像素超过限制");
+    byte[] normalized = normalizeToWebp(image, data);
+    String id = UUID.randomUUID().toString(), key = "references/" + userId + "/" + id + ".webp"; ObjectStorage storage = storageFactory.selected(); storage.put(key, normalized, "image/webp");
+    try { String filename = java.nio.file.Paths.get(file.getOriginalFilename() == null ? "reference" : file.getOriginalFilename()).getFileName().toString(); String sum = HexFormat.of().formatHex(sha(normalized)); ReferenceUploadRecord rec = new ReferenceUploadRecord(id, userId, key, filename, "image/webp", normalized.length, width, height, sum, null, null); mapper.insert(rec); return new Response(id, "/uploads/references/" + id + "/content", filename, "image/webp", width, height, normalized.length, sum); } catch (RuntimeException e) { storage.delete(key); throw e; }
   }
   public ObjectStorage.ObjectData read(String userId, String id) { ReferenceUploadRecord r = mapper.findOwned(userId, id); if (r == null) throw bad("NOT_FOUND", "参考图不存在"); return storageFactory.selected().get(r.objectKey()).orElseThrow(() -> bad("NOT_FOUND", "参考图不存在")); }
   private static boolean magic(byte[] b, String mime) { if ("image/png".equals(mime)) return b.length > 8 && (b[0] & 255) == 137 && b[1] == 80 && b[2] == 78 && b[3] == 71; if ("image/jpeg".equals(mime)) return b.length > 3 && (b[0] & 255) == 255 && (b[1] & 255) == 216 && (b[2] & 255) == 255; return b.length > 12 && b[0] == 'R' && b[1] == 'I' && b[2] == 'F' && b[3] == 'F' && b[8] == 'W' && b[9] == 'E' && b[10] == 'B' && b[11] == 'P'; }
   private static byte[] sha(byte[] b) { try { return MessageDigest.getInstance("SHA-256").digest(b); } catch (Exception e) { throw new IllegalStateException(e); } }
+  private static byte[] normalizeToWebp(BufferedImage image, byte[] original) {
+    if (image == null) return original;
+    try {
+      var writers = ImageIO.getImageWritersByFormatName("webp");
+      if (!writers.hasNext()) return original;
+      var output = new ByteArrayOutputStream();
+      try (var imageOutput = ImageIO.createImageOutputStream(output)) {
+        var writer = writers.next();
+        try { writer.setOutput(imageOutput); writer.write(image); } finally { writer.dispose(); }
+      }
+      return output.toByteArray();
+    } catch (IOException | RuntimeException ignored) {
+      return original;
+    }
+  }
+  private static int webpWidth(byte[] data) {
+    if (data.length < 31 || data[12] != 'V' || data[13] != 'P' || data[14] != '8' || data[15] != 'X') return -1;
+    return 1 + ((data[25] & 255) | ((data[26] & 255) << 8) | ((data[27] & 255) << 16));
+  }
+  private static int webpHeight(byte[] data) {
+    if (data.length < 31 || data[12] != 'V' || data[13] != 'P' || data[14] != '8' || data[15] != 'X') return -1;
+    return 1 + ((data[28] & 255) | ((data[29] & 255) << 8) | ((data[30] & 255) << 16));
+  }
   private static ApiException bad(String code, String message) { return new ApiException(HttpStatus.BAD_REQUEST, code, message); }
 }

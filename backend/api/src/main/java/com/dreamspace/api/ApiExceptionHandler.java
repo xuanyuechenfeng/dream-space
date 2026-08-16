@@ -21,6 +21,10 @@ public class ApiExceptionHandler {
   ResponseEntity<ApiError> malformed(Exception e, HttpServletRequest request) {
     return ResponseEntity.badRequest().body(new ApiError("VALIDATION_ERROR", "请求参数无效", null, requestId(request)));
   }
+  @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+  ResponseEntity<ApiError> uploadTooLarge(Exception e, HttpServletRequest request) {
+    return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(new ApiError("UPLOAD_TOO_LARGE", "上传文件超过大小限制", null, requestId(request)));
+  }
   @ExceptionHandler(Exception.class)
   ResponseEntity<ApiError> unexpected(Exception e, HttpServletRequest request) {
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ApiError("INTERNAL_ERROR", "服务暂时不可用", null, requestId(request)));

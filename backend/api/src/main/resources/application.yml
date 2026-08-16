@@ -42,6 +42,8 @@ dream-space:
     session-days: ${AUTH_SESSION_DAYS:30}
   quota:
     initial-total: ${QUOTA_INITIAL_TOTAL:100}
+  security:
+    allowed-origins: ${WEB_ORIGIN:}
 
 management:
   endpoints:
