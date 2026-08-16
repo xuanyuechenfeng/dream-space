@@ -26,7 +26,15 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 @Configuration
-@MapperScan("com.dreamspace.persistence")
+@MapperScan({
+    "com.dreamspace.persistence.auth",
+    "com.dreamspace.persistence.inspiration",
+    "com.dreamspace.persistence.generation",
+    "com.dreamspace.persistence.quota",
+    "com.dreamspace.persistence.reconciliation",
+    "com.dreamspace.persistence.admin",
+    "com.dreamspace.persistence.upload"
+})
 @EnableConfigurationProperties(DreamSpaceProperties.class)
 public class PersistenceConfiguration {
   @Bean

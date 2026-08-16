@@ -23,6 +23,7 @@ import org.springframework.test.context.DynamicPropertySource;
 
 @SpringBootTest(properties = {
         "spring.main.web-application-type=none",
+        "dream-space.worker.enabled=false",
         "spring.ai.openai.api-key=test-only-key",
         "spring.ai.openai.chat.options.model=fixture-model"
 })

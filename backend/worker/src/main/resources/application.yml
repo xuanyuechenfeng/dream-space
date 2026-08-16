@@ -16,6 +16,9 @@ spring:
       chat:
         options:
           model: ${OPENAI_MODEL:local-mock-model}
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
 
 dream-space:
   external-services-mode: ${EXTERNAL_SERVICES_MODE:mock}
@@ -44,3 +47,12 @@ dream-space:
     session-days: ${AUTH_SESSION_DAYS:30}
   quota:
     initial-total: ${QUOTA_INITIAL_TOTAL:100}
+  worker:
+    enabled: ${WORKER_ENABLED:true}
+    initial-delay-ms: ${WORKER_INITIAL_DELAY_MS:1000}
+    poll-delay-ms: ${WORKER_POLL_DELAY_MS:500}
+    provider-timeout: ${PROVIDER_TIMEOUT:PT30S}
+    mock-delay-ms: ${MOCK_GENERATION_DELAY_MS:0}
+    reconciliation-window-ms: ${RECONCILIATION_WINDOW_MS:3600000}
+    reconciliation-initial-delay-ms: ${RECONCILIATION_INITIAL_DELAY_MS:60000}
+    reconciliation-delay-ms: ${RECONCILIATION_DELAY_MS:3600000}

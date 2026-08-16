@@ -63,6 +63,8 @@ interface GenerationModel {
 
 Spring AI milestone 版本 API 可能调整，所有 `ChatModel` 调用集中在一个 adapter 文件和一个集成测试中，禁止在多个业务类散落 milestone-specific API。
 
+当前 Java 实现对应 `OpenAiCompatibleGenerationProvider`。供应商成功响应统一解析为 `images[]`，单项接受 `url`、`data` 或 `base64`；URL 仅允许 HTTP(S)，单图限制 20 MiB。空响应和瞬时 Spring AI 异常可重试，结构错误不可重试。生产接入时不得在响应、日志或 dead-letter 中保存 prompt、密钥或原始供应商错误体。
+
 ## 4.5 重试与死信
 
 可重试：连接超时、HTTP 429、HTTP 5xx、供应商临时不可用、响应体暂时为空。不可重试：参数错误、内容审核拒绝、格式无法解析、权限错误。退避使用指数退避并加抖动；达到 maxAttempts 后写 `GenerationDeadLetter`，保存 errorCode、attempts 和脱敏 payload。
@@ -77,3 +79,16 @@ Worker 定时按 windowKey 创建 `QuotaReconciliationRun`，扫描：
 - QuotaAccount total/available/reserved 与 ledger 推导值是否一致。
 
 只自动修复可证明安全的缺失 consume/release；金额漂移、余额不足和未知状态进入 BLOCKED finding。对账窗口创建和 finding 使用唯一键，重复执行不重复记账。
+
+## 4.7 实现落点与开发顺序
+
+| 能力 | Java 实现 | 关键不变量 |
+| --- | --- | --- |
+| 队列消费 | `GenerationQueueConsumer`、`RedisGenerationQueue` | 先持久化终态/补偿，再 ack；可重试异常保持 pending |
+| 任务事务 | `JdbcGenerationWorkerStore`、`GenerationMapper` | 条件状态更新、attemptKey 幂等、事件与额度同事务 |
+| 模型调用 | `GenerationProvider`、`OpenAiCompatibleGenerationProvider` | Spring AI API 只出现在适配器；输出先校验再进入图片管线 |
+| Mock | `DeterministicMockProvider`、`DeterministicMockContentModerator` | 相同 prompt/model/index 生成相同输入；故障标记可重复 |
+| 图片与存储 | `GenerationOutputPipeline` | 主图/缩略图均为真实 WebP；任一步失败清理已写对象 |
+| 对账 | `QuotaReconciliationService`、`QuotaReconciliationMapper` | windowKey/findings/ledger 幂等；不猜测修正金额漂移 |
+
+开发或修改 Worker 时按以下顺序验证：领域单元测试 -> WebP/清理测试 -> Spring AI WireMock -> PostgreSQL/Redis/S3 集成测试 -> API/SSE 端到端测试。没有真实 Redis 时只能证明消费者逻辑可编译和单元行为正确，不能把 reclaim/ack 验收标记为生产通过。
