@@ -7,6 +7,10 @@ spring:
     url: ${DATABASE_JDBC_URL:${DATABASE_URL:jdbc:postgresql://localhost:5432/dream_space}}
     username: ${DATABASE_USER:dream_space}
     password: ${DATABASE_PASSWORD:}
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
 
 server:
   port: ${API_PORT:4000}
