@@ -3,7 +3,7 @@
   "name": "generation-api-workspace",
   "title": "Implement generation API and web workspace",
   "description": "Deliver sessions, quota, task submission, SSE API, and web generation workspace.",
-  "status": "planning",
+  "status": "review",
   "dev_type": null,
   "scope": "generation session/draft/quota/task/result REST, SSE, post-commit queue publish, and frontend workspace",
   "package": null,
@@ -21,6 +21,6 @@
   "children": [],
   "parent": "08-16-vue-spring-ai-refactor",
   "relatedFiles": [],
-  "notes": "",
+  "notes": "Implemented generation session/draft/quota/task/result REST, idempotent reservation, atomic cancellation, SSE replay, post-commit Redis publication with retry, and the Vue generation workspace. API/persistence tests and frontend build pass; PostgreSQL Testcontainers remains skipped because Docker is unavailable. Desktop mock visual verification passed; a browser-level mobile viewport run remains part of quality-regression.",
   "meta": {}
 }

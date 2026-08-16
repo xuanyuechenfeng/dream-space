@@ -15,6 +15,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import com.dreamspace.persistence.quota.QuotaMapper;
+import com.dreamspace.persistence.quota.QuotaLedgerMapper;
+import com.dreamspace.persistence.quota.QuotaTransactionService;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -26,6 +29,12 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 @MapperScan("com.dreamspace.persistence")
 @EnableConfigurationProperties(DreamSpaceProperties.class)
 public class PersistenceConfiguration {
+  @Bean
+  @ConditionalOnMissingBean(QuotaTransactionService.class)
+  QuotaTransactionService quotaTransactionService(QuotaMapper accounts, QuotaLedgerMapper ledger) {
+    return new QuotaTransactionService(accounts, ledger);
+  }
+
   @Bean
   @ConditionalOnMissingBean(ObjectMapper.class)
   ObjectMapper persistenceObjectMapper() { return new ObjectMapper(); }
