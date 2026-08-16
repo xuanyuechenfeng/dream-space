@@ -3,6 +3,7 @@ package com.dreamspace.api;
 import com.dreamspace.persistence.admin.*;
 import com.dreamspace.persistence.config.DreamSpaceProperties;
 import java.time.*;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -15,8 +16,8 @@ public class AdminAuthService {
   public record CodeRequest(String phone) {}
   public record CodeResponse(String challengeId, Instant expiresAt, long retryAfterSeconds, String demoCode) {}
   public record LoginRequest(String phone, String challengeId, String code) {}
-  public record AdminView(String id, String phoneMasked, String displayName, String role) {}
-  public record SessionResponse(boolean authenticated, AdminView admin) { static SessionResponse no() { return new SessionResponse(false, null); } }
+  public record AdminView(String id, String displayName, String phoneMasked, String role, List<String> permissions) {}
+  public record SessionResponse(boolean authenticated, AdminView user) { static SessionResponse no() { return new SessionResponse(false, null); } }
   public CodeResponse sendCode(CodeRequest request) {
     String phone = AuthService.normalizePhone(request == null ? null : request.phone());
     if (mapper.findActiveByPhone(phone) == null) throw new ApiException(HttpStatus.UNAUTHORIZED, "ADMIN_UNAUTHORIZED", "管理员账号不可用");
@@ -35,6 +36,12 @@ public class AdminAuthService {
   public SessionResponse session(String token) { if (token == null) return SessionResponse.no(); AdminSessionRecord s = mapper.findActiveSession(AuthService.hash(token)); if (s == null) return SessionResponse.no(); AdminUserRecord a = mapper.findActiveById(s.adminUserId()); return a == null ? SessionResponse.no() : new SessionResponse(true, view(a)); }
   public void logout(String token) { if (token != null) mapper.deleteSession(AuthService.hash(token)); }
   public record Result(SessionResponse response, String token, Instant expiresAt) {}
-  private AdminView view(AdminUserRecord a) { return new AdminView(a.id(), a.phone().substring(0, 3) + "****" + a.phone().substring(a.phone().length() - 4), a.displayName(), a.role().name()); }
+  private AdminView view(AdminUserRecord a) {
+    List<String> permissions = a.role() == com.dreamspace.persistence.database.DatabaseEnums.AdminRole.VIEWER
+        ? List.of("tasks:read", "inspirations:read")
+        : List.of("tasks:read", "inspirations:read", "inspirations:write");
+    return new AdminView(a.id(), a.displayName(), maskPhone(a.phone()), a.role().name().toLowerCase(), permissions);
+  }
+  private static String maskPhone(String phone) { return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4); }
   private String demoCode() { return "mock".equalsIgnoreCase(props.externalServicesMode()) ? "123456" : null; }
 }

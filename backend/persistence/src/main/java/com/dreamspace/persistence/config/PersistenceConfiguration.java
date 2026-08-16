@@ -18,6 +18,9 @@ import org.springframework.context.annotation.Primary;
 import com.dreamspace.persistence.quota.QuotaMapper;
 import com.dreamspace.persistence.quota.QuotaLedgerMapper;
 import com.dreamspace.persistence.quota.QuotaTransactionService;
+import com.dreamspace.persistence.queue.GenerationQueue;
+import com.dreamspace.persistence.queue.RedisGenerationQueue;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -41,6 +44,12 @@ public class PersistenceConfiguration {
   @ConditionalOnMissingBean(QuotaTransactionService.class)
   QuotaTransactionService quotaTransactionService(QuotaMapper accounts, QuotaLedgerMapper ledger) {
     return new QuotaTransactionService(accounts, ledger);
+  }
+
+  @Bean
+  @ConditionalOnMissingBean(GenerationQueue.class)
+  GenerationQueue generationQueue(StringRedisTemplate redis, DreamSpaceProperties properties) {
+    return new RedisGenerationQueue(redis, properties);
   }
 
   @Bean

@@ -3,7 +3,7 @@
   "name": "admin-api-application",
   "title": "Implement admin API and admin application",
   "description": "Deliver admin task/inspiration APIs and the Vue admin parity UI with RBAC.",
-  "status": "planning",
+  "status": "review",
   "dev_type": null,
   "scope": "admin auth/task/reconciliation/inspiration API and Vue admin shell with RBAC",
   "package": null,
@@ -20,7 +20,13 @@
   "subtasks": [],
   "children": [],
   "parent": "08-16-vue-spring-ai-refactor",
-  "relatedFiles": [],
-  "notes": "",
+  "relatedFiles": [
+    "backend/api/src/main/java/com/dreamspace/api/AdminTasksController.java",
+    "backend/api/src/main/java/com/dreamspace/api/AdminInspirationsController.java",
+    "frontend/admin/src/views/AdminTasksView.vue",
+    "frontend/admin/src/views/AdminInspirationsView.vue",
+    "docs/design/10-unimplemented-and-acceptance.md"
+  ],
+  "notes": "Backend tests and admin typecheck/build pass. Desktop browser parity verified at 1280x720; native mobile screenshots remain part of the repository-wide visual baseline task.",
   "meta": {}
 }

@@ -1,10 +1,10 @@
 # 10 未实现功能与开发验收清单
 
-本文档区分“设计已定义”和“当前代码已实现”，避免把阶段性交付误认为可上线功能。当前仓库已具备基础工程、持久化、用户认证/灵感/上传、生成 API、Vue 用户端工作台和 Worker 生成管线；管理端业务、真实基础设施集成回归、全量质量回归和生产切流仍未完成。
+本文档区分“设计已定义”和“当前代码已实现”，避免把阶段性交付误认为可上线功能。当前仓库已具备基础工程、持久化、用户与管理员认证、生成/管理 API、Vue 用户端和管理端、Worker 生成管线；真实基础设施集成回归、全量质量回归和生产切流仍未完成。
 
 ## 10.1 当前已具备
 
-- Vue web/admin 的 Vite 入口、路由壳、TypeScript 配置和代理；web 已完成灵感、详情、登录和生成工作台页面。
+- Vue web/admin 的 Vite 入口、路由、TypeScript 配置和代理；web 已完成灵感、详情、登录和生成工作台，admin 已完成登录、任务和灵感管理页面。
 - Spring Boot API/Worker 入口、Actuator health 配置和 persistence 模块。
 - Prisma 迁移 SQL 已复制到 `backend/persistence/src/main/resources/db/migration/`，并保留原始版本顺序。
 - MyBatis 枚举/JSON 类型处理、基础 Mapper record、Redis generation queue 和 local/S3 object storage adapter。
@@ -17,6 +17,10 @@
 - 八步生成管线、输入/输出审核端口、确定性 Mock、Spring AI `ChatModel` OpenAI-compatible 适配器和错误分类。
 - EXIF 方向处理、cover crop、真实 WebP 主图/缩略图、SHA-256、对象写入补偿和 `(taskId,index)` 幂等结果持久化。
 - 成功/失败额度结算，以及按窗口幂等执行的额度对账；安全缺失结算可修复，金额和账户漂移记录为 `BLOCKED`。
+- 管理员独立 Cookie/session、VIEWER/OPERATOR/ADMIN 服务端 RBAC，以及与用户认证隔离的登录和退出链路。
+- 管理任务筛选分页、详情与结果安全读取、手机号和错误信息脱敏、额度对账摘要 API。
+- 管理灵感查询、创建、编辑、发布和下架 API；来源/授权校验和基于 `updatedAt` 的乐观并发冲突已实现。
+- Vue 管理端复用 `bak/apps/admin` 的完整样式表，包含侧栏、筛选、表格、任务详情抽屉、灵感编辑抽屉、只读角色状态和响应式断点。
 
 ## 10.2 必须开发的功能
 
@@ -29,17 +33,15 @@
 
 ### 管理端
 
-1. 完成管理员独立登录、session 过期处理和 VIEWER/OPERATOR/ADMIN 权限表现。
-2. 完成任务列表筛选分页、详情抽屉、结果资源、对账摘要和错误信息脱敏。
-3. 完成灵感创建、编辑、发布、取消发布、草稿校验和乐观更新冲突提示。
-4. 从 `bak/apps/admin` 迁移表格、抽屉、表单、导航和响应式断点；移动端不能出现横向溢出。
+1. 使用真实 PostgreSQL、Redis 和对象存储完成管理端端到端回归，覆盖 session 过期、VIEWER 拒绝写入和乐观冲突。
+2. 建立 1440x900、800x1024、390x844 的持久化截图基线；当前已完成 1280x720 浏览器检查，完整样式与 `bak/apps/admin` 一致。
+3. 补充焦点循环、后台内容不可聚焦和路由切换时抽屉关闭的自动化可访问性回归。
 
 ### API 与安全
 
 1. 补齐验证码/IP 限流、CSRF 防护和生成 JSON schema 校验。
-2. 实现 admin task、reconciliation 和 inspiration REST Controller。
-3. 补齐 PostgreSQL Mapper 的管理端死信/对账查询、分页和并发冲突处理；Worker 写入与对账修复已实现。
-4. 完成 readiness contributors：PostgreSQL、Redis、对象存储不可用时必须返回不可就绪，不能伪造成功。
+2. 为 admin task、reconciliation 和 inspiration REST Controller 补齐 OpenAPI 与真实 PostgreSQL 契约测试。
+3. 完成 readiness contributors：PostgreSQL、Redis、对象存储不可用时必须返回不可就绪，不能伪造成功。
 
 ### Worker 与模型
 
