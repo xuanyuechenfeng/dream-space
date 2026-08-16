@@ -3,7 +3,7 @@
   "name": "web-parity",
   "title": "Implement web visual shell and public flows",
   "description": "Port user-facing layout, themes, inspiration, and login behavior with bak parity.",
-  "status": "in_progress",
+  "status": "review",
   "dev_type": null,
   "scope": "frontend/web shell, inspiration/login parity, stores, tokens, assets, responsive and visual tests",
   "package": null,
@@ -21,6 +21,6 @@
   "children": [],
   "parent": "08-16-vue-spring-ai-refactor",
   "relatedFiles": [],
-  "notes": "",
+  "notes": "Implemented Vue user shell, inspiration list/detail, login, themes, localization, assets, responsive layouts, and route guards. Typecheck/build and desktop/mobile browser checks passed on the implementation branch.",
   "meta": {}
 }
