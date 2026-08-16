@@ -35,7 +35,7 @@ export const useGenerationStore = defineStore("generation", () => {
   }
   async function openSession(id: string) {
     const session = await api.generation.session(id); active.value = session; draft.value = { ...blankDraft(), ...(session.draft ?? {}) }; eventCursors.value = {};
-    for (const task of session.tasks) if (task.status === "QUEUED" || task.status === "GENERATING") connectEvents(task.id);
+    for (const task of session.tasks) if (task.status === "queued" || task.status === "generating") connectEvents(task.id);
   }
   async function createSession() { const session = await api.generation.createSession(blankDraft()); sessions.value = [{ ...session }, ...sessions.value]; active.value = session; draft.value = blankDraft(); }
   async function renameSession(id: string, title: string) { const session = await api.generation.renameSession(id, title); active.value = session; sessions.value = sessions.value.map(item => item.id === id ? { ...item, title: session.title, updatedAt: session.updatedAt } : item); }
@@ -61,9 +61,9 @@ export const useGenerationStore = defineStore("generation", () => {
     const url = `/api/generation/tasks/${encodeURIComponent(taskId)}/events?after=${cursor}`;
     const source = new EventSource(url, { withCredentials: true });
     sources.set(taskId, source);
-    const handle = async (event: Event) => { const message = event as MessageEvent; const id = Number(message.lastEventId || 0); const current = eventCursors.value[taskId] ?? 0; if (id && id <= current) return; eventCursors.value[taskId] = Math.max(current, id); await refreshTask(taskId); const task = active.value?.tasks.find(item => item.id === taskId); if (task && ["SUCCEEDED", "PARTIALLY_SUCCEEDED", "FAILED", "CANCELLED"].includes(task.status)) closeEvents(taskId); };
+    const handle = async (event: Event) => { const message = event as MessageEvent; const id = Number(message.lastEventId || 0); const current = eventCursors.value[taskId] ?? 0; if (id && id <= current) return; eventCursors.value[taskId] = Math.max(current, id); await refreshTask(taskId); const task = active.value?.tasks.find(item => item.id === taskId); if (task && ["succeeded", "partially_succeeded", "failed", "cancelled"].includes(task.status)) closeEvents(taskId); };
     for (const type of ["task.queued", "task.generating", "task.retrying", "task.input.moderated", "task.output.moderated", "task.succeeded", "task.partially_succeeded", "task.failed", "task.cancelled", "task.dead_lettered"]) source.addEventListener(type, handle);
-    source.onerror = () => { closeEvents(taskId); window.setTimeout(() => { const task = active.value?.tasks.find(item => item.id === taskId); if (task && ["QUEUED", "GENERATING"].includes(task.status)) connectEvents(taskId); }, 1000); };
+    source.onerror = () => { closeEvents(taskId); window.setTimeout(() => { const task = active.value?.tasks.find(item => item.id === taskId); if (task && ["queued", "generating"].includes(task.status)) connectEvents(taskId); }, 1000); };
   }
   return { options, quota, sessions, active, draft, loading, submitting, error, estimatedCost, load, openSession, createSession, renameSession, removeSession, saveDraft, uploadReference, submit, refreshTask, cancel, retry, connectEvents, closeEvents };
 });

@@ -84,6 +84,23 @@ class GenerationServiceTest {
     verify(publisher, never()).publish(any());
   }
 
+  @Test
+  void mapsDatabaseEnumsToLowercaseContractValues() {
+    GenerationMapper mapper = mock(GenerationMapper.class);
+    when(mapper.findTask("task-1")).thenReturn(task("prompt", "request-key-123", 1, GenerationResolution.K2, new ObjectMapper()));
+    when(mapper.listResults("task-1")).thenReturn(List.of(new com.dreamspace.persistence.generation.GenerationResultRecord(
+        "result-1", "task-1", 0, "/results/task-1/result-1.webp", "results/task-1/result-1.webp",
+        "thumbnails/task-1/result-1.webp", "checksum", 100, 100, "image/webp", 100, 50, 50, 20,
+        ModerationStatus.APPROVED, true, Instant.parse("2026-08-17T00:00:00Z"))));
+    GenerationService service = service(mapper, mock(QuotaTransactionService.class),
+        mock(GenerationQueuePublisher.class), new TestTransactionManager(), new ObjectMapper());
+
+    var result = service.getTask("user-1", "task-1");
+
+    assertThat(result.status()).isEqualTo("queued");
+    assertThat(result.results()).singleElement().satisfies(item -> assertThat(item.moderationStatus()).isEqualTo("approved"));
+  }
+
   private static GenerationService service(GenerationMapper mapper, QuotaTransactionService quota,
       GenerationQueuePublisher publisher, TestTransactionManager transactions, ObjectMapper json) {
     DreamSpaceProperties properties = new DreamSpaceProperties(null, null, null, null, null, null, null);
