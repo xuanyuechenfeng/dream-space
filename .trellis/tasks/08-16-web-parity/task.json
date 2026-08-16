@@ -16,7 +16,7 @@
   "base_branch": "feature/refactor-auth-inspiration-api",
   "worktree_path": null,
   "commit": null,
-  "pr_url": null,
+  "pr_url": "https://github.com/xuanyuechenfeng/dream-space/pull/12",
   "subtasks": [],
   "children": [],
   "parent": "08-16-vue-spring-ai-refactor",

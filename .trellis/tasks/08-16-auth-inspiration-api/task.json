@@ -3,7 +3,7 @@
   "name": "auth-inspiration-api",
   "title": "Implement authentication and inspiration APIs",
   "description": "Implement user/admin authentication, RBAC, inspiration APIs, and upload contracts.",
-  "status": "in_progress",
+  "status": "review",
   "dev_type": null,
   "scope": "backend/api auth, admin auth/RBAC, published inspiration reads, reference uploads, and contract tests",
   "package": null,
@@ -16,11 +16,11 @@
   "base_branch": "feature/refactor-persistence-infrastructure",
   "worktree_path": null,
   "commit": null,
-  "pr_url": null,
+  "pr_url": "https://github.com/xuanyuechenfeng/dream-space/pull/11",
   "subtasks": [],
   "children": [],
   "parent": "08-16-vue-spring-ai-refactor",
   "relatedFiles": [],
-  "notes": "",
+  "notes": "Implemented isolated user/admin authentication, agreement acceptance, server RBAC, published inspiration reads, reference upload validation and ownership checks. Covered by API and persistence tests in the dependent branch chain.",
   "meta": {}
 }
