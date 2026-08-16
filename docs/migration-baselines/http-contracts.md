@@ -59,6 +59,6 @@ SSE event types are `task.queued`, `task.generating`, `task.retrying`, `task.inp
 | `GET /admin/inspirations` | `inspirations:read` | Query `status, category, query, page, pageSize`; returns paginated records. |
 | `GET /admin/inspirations/:id` | `inspirations:read` | Full `AdminInspirationRecord`. |
 | `POST /admin/inspirations` and `PATCH /admin/inspirations/:id` | `inspirations:write` | `AdminInspirationInput`; returns the saved record. |
-| `POST /admin/inspirations/:id/publish` and `/unpublish` | `inspirations:write` | No body; returns the state-updated record. |
+| `POST /admin/inspirations/:id/publish` and `/unpublish` | `inspirations:write` | `{ updatedAt }`; returns the state-updated record, or `409 OPTIMISTIC_CONFLICT` for a stale version. |
 
 The legacy Nest default error body is `{ statusCode, message, error }`; `message` can be a string, string array, or a domain object containing `code`, `required`, and `available` (for example quota/idempotency errors). Spring adapters must preserve domain fields while mapping to the documented `code/message/details/requestId` envelope in `docs/design/06-contracts-and-security.md`.

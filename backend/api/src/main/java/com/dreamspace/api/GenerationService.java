@@ -208,7 +208,7 @@ public class GenerationService {
         List<GenerationTaskEventRecord> events = mapper.listEvents(taskId, cursor, 100);
         for (GenerationTaskEventRecord event : events) {
           emitter.send(SseEmitter.event().id(Long.toString(event.id())).name(event.type())
-              .data(new EventView(event.id(), event.taskId(), event.type(), event.status().name(), event.payload(), event.createdAt())));
+              .data(new EventView(event.id(), event.taskId(), event.type(), apiValue(event.status()), event.payload(), event.createdAt())));
           cursor = event.id();
           if (terminal(event.status())) { emitter.complete(); return; }
         }
@@ -328,12 +328,16 @@ public class GenerationService {
     List<ResultView> results = mapper.listResults(task.id()).stream().map(result -> new ResultView(result.id(), result.index(),
         "/generation/results/" + result.id() + "/content", "/generation/results/" + result.id() + "/thumbnail",
         result.width(), result.height(), result.mimeType(), result.byteSize(), result.isAiGenerated(),
-        result.moderationStatus() == null ? null : result.moderationStatus().name())).toList();
+        apiValue(result.moderationStatus()))).toList();
     List<String> refs = task.referenceImageUrls() == null || !task.referenceImageUrls().isArray() ? List.of()
         : objectMapper.convertValue(task.referenceImageUrls(), objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
-    return new TaskView(task.id(), task.sessionId(), task.status().name(), task.prompt(), task.model(), task.ratio().databaseValue(),
+    return new TaskView(task.id(), task.sessionId(), apiValue(task.status()), task.prompt(), task.model(), task.ratio().databaseValue(),
         task.resolution().databaseValue(), task.imageCount(), refs, task.unitCost(), task.totalCost(), task.errorCode(), task.errorMessage(),
         task.startedAt(), task.completedAt(), task.createdAt(), task.updatedAt(), results);
+  }
+
+  private static String apiValue(Enum<?> value) {
+    return value == null ? null : value.name().toLowerCase(java.util.Locale.ROOT);
   }
 
   private QuotaView quotaView(QuotaAccountRecord account) {

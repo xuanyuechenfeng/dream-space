@@ -3,6 +3,9 @@ node_modules/
 dist/
 *.tsbuildinfo
 .pnpm-store/
+coverage/
+playwright-report/
+test-results/
 
 # Backend
 target/

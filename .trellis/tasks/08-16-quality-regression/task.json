@@ -3,7 +3,7 @@
   "name": "quality-regression",
   "title": "Implement quality gates and regression suites",
   "description": "Add contract, E2E, visual, accessibility, and responsive regression verification.",
-  "status": "planning",
+  "status": "review",
   "dev_type": null,
   "scope": "backend/frontend contract, integration, E2E, accessibility, responsive, visual, credential, and immutability gates",
   "package": null,
@@ -20,7 +20,15 @@
   "subtasks": [],
   "children": [],
   "parent": "08-16-vue-spring-ai-refactor",
-  "relatedFiles": [],
-  "notes": "",
+  "relatedFiles": [
+    ".github/workflows/quality.yml",
+    "scripts/quality-gates.mjs",
+    "frontend/playwright.config.ts",
+    "frontend/tests/e2e/web.spec.ts",
+    "frontend/tests/e2e/admin.spec.ts",
+    "backend/api/src/test/java/com/dreamspace/api/HttpContractMockMvcTest.java",
+    "backend/persistence/src/test/java/com/dreamspace/persistence/RedisGenerationQueueIntegrationTest.java"
+  ],
+  "notes": "Implemented contract normalization, MockMvc HTTP envelopes, Redis/PostgreSQL Testcontainers gates, Vitest fixtures, Playwright web/admin journeys, axe critical/serious checks, duplicate-id/DOM-target/overflow audits, responsive visual baselines, credential scanning, theme/locale checks, and bak immutability CI. Verification passed twice: backend Maven test 39 tests with 2 Docker-dependent local skips, frontend typecheck/build/unit (5 tests) and Playwright (15 tests) passed in both runs. Chromium visual baselines were reviewed at web 1440x900/1024x768/390x844 and admin 1440x900/800x1024/390x844. Docker-dependent tests are configured to fail in CI when Docker is unavailable.",
   "meta": {}
 }

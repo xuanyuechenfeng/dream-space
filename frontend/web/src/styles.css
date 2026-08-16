@@ -1940,29 +1940,31 @@ button:disabled {
   }
   .generation-top {
     inset: 0 0 auto;
-    height: 68px;
+    height: 116px;
     padding: 8px 12px;
-    overflow-x: auto;
-    justify-content: flex-start;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: center;
   }
   .generation-search-control.expanded {
-    width: 220px;
-    flex-basis: 220px;
+    width: 100%;
+    grid-column: 1 / -1;
   }
   .generation-search-panel {
     width: 100%;
   }
   .generation-filter {
-    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
   }
   .timeline {
-    padding: 78px 16px 20px;
+    padding: 126px 16px 20px;
   }
   .generation-main.is-empty {
     grid-template-rows: minmax(210px, 1fr) auto 26px;
   }
   .generation-main.is-empty .timeline {
-    padding: 78px 16px 20px;
+    padding: 126px 16px 20px;
   }
   .generation-main.is-empty > .composer,
   .generation-main > .composer,
