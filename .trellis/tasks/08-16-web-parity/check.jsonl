@@ -1,1 +1,5 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file":"docs/design/02-frontend.md","reason":"Vue route, store, interaction, token, and responsive requirements."}
+{"file":"docs/design/06-contracts-and-security.md","reason":"Cookie credentials, API error, upload, and auth behavior consumed by the web app."}
+{"file":"docs/migration-baselines/routes-and-visuals.md","reason":"bak route and visual compatibility baseline."}
+{"file":"docs/migration-baselines/http-contracts.md","reason":"Typed frontend API response and error compatibility."}
+{"file":".trellis/spec/frontend/index.md","reason":"Repository frontend quality and structure rules."}

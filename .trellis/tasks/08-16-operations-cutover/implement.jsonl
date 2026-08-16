@@ -1,1 +1,3 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file":"docs/design/01-architecture.md","reason":"Deployment/profile/health/version boundary implementation contract."}
+{"file":"docs/design/05-data-and-infrastructure.md","reason":"Infrastructure, storage, environment, and Docker implementation contract."}
+{"file":"docs/design/07-testing-migration.md","reason":"Cutover, rollback, and retirement implementation contract."}

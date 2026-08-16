@@ -1,1 +1,5 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file":"docs/design/03-backend-api.md","reason":"Generation session/task/SSE controller and transaction boundaries."}
+{"file":"docs/design/04-worker-ai.md","reason":"Task states, event semantics, queue payload, and settlement consumed by the API."}
+{"file":"docs/design/06-contracts-and-security.md","reason":"Generation request, response, SSE, cookies, and ownership contracts."}
+{"file":"docs/design/08-database-schema.md","reason":"Generation and quota fields, unique keys, events, and invariants."}
+{"file":"docs/migration-baselines/http-contracts.md","reason":"Existing generation HTTP fixtures and error compatibility."}

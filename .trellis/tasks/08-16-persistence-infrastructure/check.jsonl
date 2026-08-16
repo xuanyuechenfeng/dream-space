@@ -1,1 +1,6 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file":"docs/design/05-data-and-infrastructure.md","reason":"PostgreSQL, Redis, object-storage, configuration, and readiness contract baseline."}
+{"file":"docs/migration-baselines/data-contracts.md","reason":"Schema, enum, queue, object-key, and quota invariants preserved by this task."}
+{"file":"docs/design/03-backend-api.md","reason":"Repository and transaction boundaries consumed by API services."}
+{"file":"docs/design/08-database-schema.md","reason":"Field-level schema, enum, index, cascade, JSON, and quota invariants."}
+{"file":"docs/design/09-configuration-and-layout.md","reason":"Environment variables, module ownership, startup, and secret rules."}
+{"file":"docs/design/10-unimplemented-and-acceptance.md","reason":"Current implementation gaps and blocking acceptance conditions."}
