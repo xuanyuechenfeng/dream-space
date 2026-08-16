@@ -13,8 +13,6 @@
 | 阶段 C：真实生成能力    | 进行中 | C1-C2、C3a、C4a 已完成；C4b 为低优先级运维能力 |
 | 阶段 D：运营与上线      | 未开始 | 先推进 ADM-0 至 ADM-4，再进入 D1-D6 上线门禁   |
 
-每个阶段的目标、验收条件和完成评估见 [开发阶段计划](docs/development-plan.md)。
-
 ## 系统组成
 
 ```text
@@ -39,11 +37,10 @@
 ├── infrastructure/docker/  # 本地开发依赖与容器配置
 ├── e2e/                     # 跨应用端到端测试
 ├── scripts/                 # 项目维护和数据脚本
-├── docs/                    # 产品、设计、架构、开发与部署文档
 └── prototype/               # 阶段 1 高保真静态原型
 ```
 
-完整目录职责和内部结构见 [项目目录规划](docs/project-structure.md)。正式工程已提供公开灵感目录、作品详情、安全演示登录，以及会话、任务、额度、BullMQ 模拟生成和 SSE 事件 API。
+正式工程已提供公开灵感目录、作品详情、安全演示登录，以及会话、任务、额度、BullMQ 模拟生成和 SSE 事件 API。
 
 ## 开发环境
 
@@ -146,22 +143,6 @@ python3 -m http.server 8080 -d prototype
 ```
 
 浏览器访问 [http://localhost:8080](http://localhost:8080)。
-
-## 文档入口
-
-- [开发阶段计划](docs/development-plan.md)：阶段目标、验收条件和完成评估
-- [商用就绪审计与决策记录](docs/commercial-readiness.md)：计划偏差、架构决策、风险和上线门禁
-- [管理端产品需求](docs/admin-console-requirements.md)：角色、基础管理、审核、模型和运营需求
-- [管理端功能架构](docs/admin-console-architecture.md)：管理端信息架构、API 边界和 ADM 阶段路线
-- [项目目录规划](docs/project-structure.md)：应用、共享包及内部目录职责
-- [阶段 1 文档索引](docs/phase-1/README.md)：产品和设计交付物
-- [产品需求](docs/phase-1/01-product-requirements.md)
-- [信息架构与用户流程](docs/phase-1/02-information-architecture-and-user-flows.md)
-- [页面与组件清单](docs/phase-1/03-page-and-component-inventory.md)
-- [交互状态矩阵](docs/phase-1/04-interaction-state-matrix.md)
-- [视觉规范](docs/phase-1/05-visual-specification.md)
-- [验收清单](docs/phase-1/06-acceptance-checklist.md)
-- [部署与发布方案](docs/deployment.md)
 
 ## 协作与安全
 

@@ -1,4 +1,4 @@
-docs/phase-1/
 prototype/
+**/next-env.d.ts
 造梦空间文生图平台方案.md
 pnpm-lock.yaml
