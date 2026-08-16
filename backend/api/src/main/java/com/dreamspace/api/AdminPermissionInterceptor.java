@@ -27,9 +27,9 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
     if (permission == null) permission = new DefaultPermission();
     String token = CookieSupport.read(request, CookieSupport.ADMIN);
     var session = auth.session(token);
-    if (!session.authenticated() || session.admin() == null) throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "请先登录管理员账号");
-    AdminRole role = AdminRole.valueOf(session.admin().role());
-    var principal = new AdminPrincipal(session.admin().id(), session.admin().displayName(), role);
+    if (!session.authenticated() || session.user() == null) throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "请先登录管理员账号");
+    AdminRole role = AdminRole.valueOf(session.user().role().toUpperCase());
+    var principal = new AdminPrincipal(session.user().id(), session.user().displayName(), role);
     request.setAttribute(PRINCIPAL_ATTRIBUTE, principal);
     if (!principal.allows(permission.minimum())) throw new ApiException(HttpStatus.FORBIDDEN, "ADMIN_ROLE_REQUIRED", "管理员权限不足");
     return true;

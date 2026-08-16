@@ -16,7 +16,8 @@ class AdminPermissionInterceptorTest {
   void viewerCannotInvokeOperatorWrite() throws Exception {
     var auth = mock(AdminAuthService.class);
     when(auth.session("admin-token")).thenReturn(new AdminAuthService.SessionResponse(true,
-        new AdminAuthService.AdminView("admin-1", "138****0000", "Viewer", "VIEWER")));
+        new AdminAuthService.AdminView("admin-1", "Viewer", "138****0000", "viewer",
+            java.util.List.of("tasks:read", "inspirations:read"))));
     var interceptor = new AdminPermissionInterceptor(auth);
     var request = mock(HttpServletRequest.class);
     when(request.getRequestURI()).thenReturn("/admin/inspirations/1/publish");
