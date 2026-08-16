@@ -5,6 +5,7 @@
 ## 文档入口
 
 - [当前系统设计方案](./current-system-design.md)：总体架构、技术栈、数据库、模块功能、前台页面设计、配置、目录和未实现能力。
+- [Vue + Spring AI 重构设计方案](./vue-spring-ai-refactor-design.md)：Vue 3/Vite 5 前端、Spring Boot 4/Spring MVC/Spring AI 后端迁移方案，以及与 `bak` 前台功能和视觉风格的等价契约。
 
 ## 范围与口径
 
