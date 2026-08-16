@@ -1,1 +1,5 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file":"docs/design/01-architecture.md","reason":"Deployment units, profiles, dependency boundaries, health, logging, and version requirements."}
+{"file":"docs/design/05-data-and-infrastructure.md","reason":"PostgreSQL, Redis, storage, environment, and Docker rules."}
+{"file":"docs/design/07-testing-migration.md","reason":"M7 cutover, M8 cleanup, rollout, and rollback exit criteria."}
+{"file":"docs/design/09-configuration-and-layout.md","reason":"Configuration files, environment variables, secrets, and local startup order."}
+{"file":"docs/design/10-unimplemented-and-acceptance.md","reason":"Operational blockers and global definition of done."}

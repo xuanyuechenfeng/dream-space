@@ -5,6 +5,10 @@ spring:
     default: worker
   main:
     web-application-type: none
+  datasource:
+    url: ${DATABASE_JDBC_URL:${DATABASE_URL:jdbc:postgresql://localhost:5432/dream_space}}
+    username: ${DATABASE_USER:dream_space}
+    password: ${DATABASE_PASSWORD:}
   ai:
     openai:
       api-key: ${OPENAI_API_KEY:local-mock-key}
@@ -15,3 +19,28 @@ spring:
 
 dream-space:
   external-services-mode: ${EXTERNAL_SERVICES_MODE:mock}
+  database:
+    url: ${DATABASE_URL:}
+    username: ${DATABASE_USER:}
+  redis:
+    url: ${REDIS_URL:redis://localhost:6379}
+    stream: generation
+    consumer-group: generation-workers
+    reclaim-idle: ${REDIS_RECLAIM_IDLE:PT30S}
+  storage:
+    mode: ${OBJECT_STORAGE_MODE:local}
+    local-directory: ${LOCAL_STORAGE_DIR:./var/objects}
+    endpoint: ${S3_ENDPOINT:}
+    bucket: ${S3_BUCKET:dream-space}
+    region: ${S3_REGION:us-east-1}
+    access-key: ${S3_ACCESS_KEY:}
+    secret-key: ${S3_SECRET_KEY:}
+    signed-url-ttl-seconds: ${S3_SIGNED_URL_TTL_SECONDS:300}
+  queue:
+    max-attempts: ${QUEUE_MAX_ATTEMPTS:3}
+    retry-backoff: ${QUEUE_RETRY_BACKOFF:PT0.5S}
+  auth:
+    code-ttl-seconds: ${AUTH_CODE_TTL_SECONDS:300}
+    session-days: ${AUTH_SESSION_DAYS:30}
+  quota:
+    initial-total: ${QUOTA_INITIAL_TOTAL:100}

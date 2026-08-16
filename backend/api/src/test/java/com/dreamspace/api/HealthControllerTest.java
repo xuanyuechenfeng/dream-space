@@ -16,4 +16,11 @@ class HealthControllerTest {
         assertThat(controller.live().service()).isEqualTo("api-live");
         assertThat(controller.ready().status()).isEqualTo("ok");
     }
+
+    @Test
+    void reportsDependencyFailureOnReadiness() {
+        var controller = new HealthController(Clock.fixed(Instant.EPOCH, ZoneOffset.UTC), () -> false);
+
+        assertThat(controller.ready().status()).isEqualTo("down");
+    }
 }

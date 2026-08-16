@@ -1,1 +1,3 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file":"docs/design/README.md","reason":"Approved detailed-design index and delivery rules."}
+{"file":"docs/design/07-testing-migration.md","reason":"Task map, migration stages, quality matrix, and completion definition."}
+{"file":"docs/design/10-unimplemented-and-acceptance.md","reason":"Remaining scope, blockers, and final acceptance requirements."}

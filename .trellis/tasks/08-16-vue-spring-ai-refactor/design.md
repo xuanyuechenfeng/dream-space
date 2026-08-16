@@ -15,5 +15,6 @@ The documentation branch remains the base while its review is open. Each impleme
 ## Compatibility Sources
 
 - `docs/design/01-architecture.md` through `docs/design/07-testing-migration.md`
+- `docs/design/08-database-schema.md`, `09-configuration-and-layout.md`, and `10-unimplemented-and-acceptance.md`
 - `bak/apps/web`, `bak/apps/admin`, `bak/apps/api`, and `bak/apps/worker`
 - `bak/packages/db/prisma/schema.prisma` and its migrations

@@ -1,1 +1,5 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file":"docs/design/02-frontend.md","reason":"Admin routes, shell, table, drawers, role states, and breakpoints."}
+{"file":"docs/design/03-backend-api.md","reason":"Admin controllers, RBAC, pagination, and transaction boundaries."}
+{"file":"docs/design/06-contracts-and-security.md","reason":"Admin cookie isolation, permission matrix, redaction, and resource security."}
+{"file":"docs/design/08-database-schema.md","reason":"Admin, inspiration, task, result, and reconciliation table structures."}
+{"file":"docs/migration-baselines/routes-and-visuals.md","reason":"Admin route and visual compatibility baseline."}
