@@ -50,8 +50,26 @@ public interface GenerationMapper {
   @Select("SELECT * FROM \"GenerationTaskEvent\" WHERE \"taskId\" = #{taskId} AND \"id\" > #{afterId} ORDER BY \"id\" ASC LIMIT #{limit}")
   List<GenerationTaskEventRecord> listEvents(@Param("taskId") String taskId, @Param("afterId") long afterId, @Param("limit") int limit);
 
-  @Update("UPDATE \"GenerationTask\" SET \"status\" = 'GENERATING', \"attempts\" = \"attempts\" + 1, \"lastAttemptKey\" = #{attemptKey}, \"startedAt\" = COALESCE(\"startedAt\", CURRENT_TIMESTAMP), \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = #{taskId} AND \"status\" = 'QUEUED' AND (\"lastAttemptKey\" IS NULL OR \"lastAttemptKey\" <> #{attemptKey})")
+  @Update("UPDATE \"GenerationTask\" SET \"status\" = 'GENERATING', \"attempts\" = \"attempts\" + 1, \"lastAttemptKey\" = #{attemptKey}, \"startedAt\" = COALESCE(\"startedAt\", CURRENT_TIMESTAMP), \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = #{taskId} AND \"status\" IN ('QUEUED','GENERATING') AND (\"lastAttemptKey\" IS NULL OR \"lastAttemptKey\" <> #{attemptKey})")
   int claimQueuedTask(@Param("taskId") String taskId, @Param("attemptKey") String attemptKey);
+  @Update("UPDATE \"GenerationTask\" SET \"inputModerationStatus\" = #{status}::\"ModerationStatus\", \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = #{taskId} AND \"status\" = 'GENERATING'")
+  int updateInputModeration(@Param("taskId") String taskId, @Param("status") String status);
+  @Update("UPDATE \"GenerationTask\" SET \"outputModerationStatus\" = #{status}::\"ModerationStatus\", \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = #{taskId} AND \"status\" = 'GENERATING'")
+  int updateOutputModeration(@Param("taskId") String taskId, @Param("status") String status);
+  @Insert("INSERT INTO \"GenerationResult\" (\"id\",\"taskId\",\"index\",\"imagePath\",\"objectKey\",\"thumbnailObjectKey\",\"checksumSha256\",\"width\",\"height\",\"mimeType\",\"byteSize\",\"thumbnailWidth\",\"thumbnailHeight\",\"thumbnailByteSize\",\"moderationStatus\",\"isAiGenerated\",\"createdAt\") VALUES (#{id},#{taskId},#{index},#{imagePath},#{objectKey},#{thumbnailObjectKey},#{checksumSha256},#{width},#{height},#{mimeType},#{byteSize},#{thumbnailWidth},#{thumbnailHeight},#{thumbnailByteSize},'APPROVED',#{aiGenerated},CURRENT_TIMESTAMP) ON CONFLICT (\"taskId\",\"index\") DO NOTHING")
+  int insertResult(@Param("id") String id, @Param("taskId") String taskId, @Param("index") int index,
+      @Param("imagePath") String imagePath, @Param("objectKey") String objectKey,
+      @Param("thumbnailObjectKey") String thumbnailObjectKey, @Param("checksumSha256") String checksumSha256,
+      @Param("width") int width, @Param("height") int height, @Param("mimeType") String mimeType,
+      @Param("byteSize") int byteSize, @Param("thumbnailWidth") int thumbnailWidth,
+      @Param("thumbnailHeight") int thumbnailHeight, @Param("thumbnailByteSize") int thumbnailByteSize,
+      @Param("aiGenerated") boolean aiGenerated);
+  @Insert("INSERT INTO \"GenerationDeadLetter\" (\"id\",\"taskId\",\"errorCode\",\"errorMessage\",\"attempts\",\"payload\",\"createdAt\") VALUES (#{id},#{taskId},#{errorCode},#{errorMessage},#{attempts},CAST(#{payload} AS JSONB),CURRENT_TIMESTAMP) ON CONFLICT (\"taskId\") DO UPDATE SET \"errorCode\" = EXCLUDED.\"errorCode\", \"errorMessage\" = EXCLUDED.\"errorMessage\", \"attempts\" = EXCLUDED.\"attempts\", \"payload\" = EXCLUDED.\"payload\"")
+  int upsertDeadLetter(@Param("id") String id, @Param("taskId") String taskId,
+      @Param("errorCode") String errorCode, @Param("errorMessage") String errorMessage,
+      @Param("attempts") int attempts, @Param("payload") String payload);
+  @Update("UPDATE \"GenerationSession\" SET \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = #{sessionId}")
+  int touchSession(String sessionId);
   @Update("UPDATE \"GenerationTask\" SET \"queueJobId\" = #{messageId}, \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = #{taskId}")
   int setQueueMessageId(@Param("taskId") String taskId, @Param("messageId") String messageId);
   @Insert("INSERT INTO \"GenerationTaskEvent\" (\"taskId\",\"type\",\"status\",\"payload\",\"createdAt\") VALUES (#{taskId},#{type},#{status}::\"GenerationTaskStatus\",CAST(#{payload} AS JSONB),CURRENT_TIMESTAMP)")

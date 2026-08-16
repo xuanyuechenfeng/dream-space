@@ -52,10 +52,18 @@ public final class RedisGenerationQueue implements GenerationQueue {
 
   @Override public List<Delivery> reclaim(String consumer, Duration minIdle, int count) {
     ensureGroup();
-    var pending = streams.pending(properties.redis().stream(), properties.redis().consumerGroup(), Range.unbounded(), count, minIdle);
-    var ids = pending.stream().map(message -> message.getId()).toArray(RecordId[]::new);
+    var pending = streams.pending(properties.redis().stream(), properties.redis().consumerGroup(),
+        Range.unbounded(), Math.max(count, count * 4), minIdle);
+    var eligible = pending.stream().filter(message -> {
+      int exponent = Math.min(6, Math.max(0, (int) message.getTotalDeliveryCount() - 1));
+      Duration backoff = minIdle.multipliedBy(1L << exponent);
+      long jitterBound = Math.max(1, minIdle.toMillis() / 4);
+      long jitter = Math.floorMod(message.getIdAsString().hashCode(), jitterBound);
+      return message.getElapsedTimeSinceLastDelivery().compareTo(backoff.plusMillis(jitter)) >= 0;
+    }).limit(count).toList();
+    var ids = eligible.stream().map(message -> message.getId()).toArray(RecordId[]::new);
     if (ids.length == 0) return List.of();
-    var counts = pending.stream().collect(Collectors.toMap(message -> message.getIdAsString(), message -> (int) message.getTotalDeliveryCount() + 1));
+    var counts = eligible.stream().collect(Collectors.toMap(message -> message.getIdAsString(), message -> (int) message.getTotalDeliveryCount() + 1));
     var claimed = streams.claim(properties.redis().stream(), properties.redis().consumerGroup(), consumer, minIdle, ids);
     return toDeliveries(claimed, counts);
   }
@@ -67,10 +75,15 @@ public final class RedisGenerationQueue implements GenerationQueue {
       String id = record.getId().getValue();
       if (taskId != null) result.add(new Delivery(id, new GenerationJob(taskId,
           record.getValue().getOrDefault("attemptKey", taskId + ":1"),
-          Integer.parseInt(record.getValue().getOrDefault("attemptNumber", "1")),
-          Integer.parseInt(record.getValue().getOrDefault("maxAttempts", "3")),
-          Integer.parseInt(record.getValue().getOrDefault("schemaVersion", "1"))), deliveryCounts.getOrDefault(id, 1)));
+          parseInt(record.getValue().get("attemptNumber"), -1),
+          parseInt(record.getValue().get("maxAttempts"), -1),
+          parseInt(record.getValue().get("schemaVersion"), -1)), deliveryCounts.getOrDefault(id, 1)));
     }
     return result;
+  }
+
+  private static int parseInt(String value, int fallback) {
+    try { return value == null ? fallback : Integer.parseInt(value); }
+    catch (NumberFormatException ignored) { return fallback; }
   }
 }

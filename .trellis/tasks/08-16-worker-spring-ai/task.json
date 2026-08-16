@@ -3,7 +3,7 @@
   "name": "worker-spring-ai",
   "title": "Implement worker and Spring AI pipeline",
   "description": "Deliver Redis Stream processing, OpenAI-compatible ChatModel, images, retries, and reconciliation.",
-  "status": "planning",
+  "status": "review",
   "dev_type": null,
   "scope": "Redis Stream worker, task state machine, Spring AI adapter, image pipeline, retries, dead letters, and reconciliation",
   "package": null,

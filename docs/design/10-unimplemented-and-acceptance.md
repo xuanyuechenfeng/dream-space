@@ -1,6 +1,6 @@
 # 10 未实现功能与开发验收清单
 
-本文档区分“设计已定义”和“当前代码已实现”，避免把阶段性交付误认为可上线功能。当前仓库已具备基础工程、持久化、用户认证/灵感/上传、生成 API 和 Vue 用户端工作台；Worker、管理端业务、全量质量回归和生产切流仍未完成。
+本文档区分“设计已定义”和“当前代码已实现”，避免把阶段性交付误认为可上线功能。当前仓库已具备基础工程、持久化、用户认证/灵感/上传、生成 API、Vue 用户端工作台和 Worker 生成管线；管理端业务、真实基础设施集成回归、全量质量回归和生产切流仍未完成。
 
 ## 10.1 当前已具备
 
@@ -13,6 +13,10 @@
 - 用户/管理员独立认证、公开灵感和参考图上传 API，包含资源归属与基础 RBAC。
 - 生成 options、quota、session/draft、task/cancel/retry、result 和 SSE API；任务写入后再发布 Redis，并对未发布任务定时补偿。
 - Web 生成工作台的会话侧栏、参数、参考图、额度、任务时间线、取消/重试、结果预览和下载交互。
+- Worker Redis Stream 消费组、pending reclaim、指数退避、条件抢占、有限重试、死信和终态 ack。
+- 八步生成管线、输入/输出审核端口、确定性 Mock、Spring AI `ChatModel` OpenAI-compatible 适配器和错误分类。
+- EXIF 方向处理、cover crop、真实 WebP 主图/缩略图、SHA-256、对象写入补偿和 `(taskId,index)` 幂等结果持久化。
+- 成功/失败额度结算，以及按窗口幂等执行的额度对账；安全缺失结算可修复，金额和账户漂移记录为 `BLOCKED`。
 
 ## 10.2 必须开发的功能
 
@@ -20,7 +24,7 @@
 
 1. 使用真实 Worker 完成生成端到端回归，覆盖成功、部分成功、失败、取消、重试和 SSE 断线恢复。
 2. 补齐生成工作台 1440x900、1024x768、800x1024、390x844 截图基线和中英文长文本回归。
-3. 加强上传 WebP 编码一致性；运行时缺少 WebP writer 时不能仅修改 MIME 元数据。
+3. 将参考图上传链路也切换到与 Worker 相同的真实 WebP writer；运行时缺少 writer 时必须明确失败。
 4. 从 `bak/apps/web` 持续核对 DOM、文案、素材、浅色/深色 token、移动断点和 reduced-motion 行为。
 
 ### 管理端
@@ -34,16 +38,16 @@
 
 1. 补齐验证码/IP 限流、CSRF 防护和生成 JSON schema 校验。
 2. 实现 admin task、reconciliation 和 inspiration REST Controller。
-3. 补齐 PostgreSQL Mapper 的管理端、死信和对账表读写、分页和并发冲突处理。
+3. 补齐 PostgreSQL Mapper 的管理端死信/对账查询、分页和并发冲突处理；Worker 写入与对账修复已实现。
 4. 完成 readiness contributors：PostgreSQL、Redis、对象存储不可用时必须返回不可就绪，不能伪造成功。
 
 ### Worker 与模型
 
-1. 实现 Redis Stream consumer 的抢占、ack、pending reclaim、重试退避和 dead-letter 持久化。
-2. 实现 `GenerationTaskStateMachine` 和八步生成管线，包括审核、图像处理、缩略图、对象清理和结果落库。
-3. 完成 Spring AI 2.0.0-M5 `ChatModel` 的 OpenAI-compatible adapter、WireMock fixture 和错误分类。
-4. 完成额度结算和定时对账；缺失流水可安全修复，金额漂移必须进入 `BLOCKED`。
-5. 接入 S3 client/presigner 的 Spring 配置，补齐 endpoint、region、credentials 和 TTL 校验。
+1. 使用真实 PostgreSQL + Redis + S3-compatible 存储完成 Worker 集成回归，验证 reclaim、取消竞态、重复投递和数据库事务回滚。
+2. 为 OpenAI-compatible 供应商补充 timeout、429、5xx、401/403 和图片 URL 下载的 WireMock 契约用例，并校验供应商 request ID 脱敏日志。
+3. 接入生产内容审核实现；当前审核端口及确定性 Mock 已具备，生产模式仍需绑定实际审核服务。
+4. 为 S3 client/presigner 配置补充 endpoint、region、credentials、TTL 和部分写入失败的集成测试。
+5. 建立 Worker 指标和告警：pending 数、重试次数、dead-letter 数、模型时延、图片处理时延、清理失败和对账 `BLOCKED` 数。
 
 ### 工程与运维
 
