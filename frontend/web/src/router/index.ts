@@ -1,24 +1,28 @@
 import { createRouter, createWebHistory } from "vue-router";
-import ScaffoldView from "@/views/ScaffoldView.vue";
+import InspirationGalleryView from "@/features/inspiration/InspirationGalleryView.vue";
+import InspirationDetailView from "@/features/inspiration/InspirationDetailView.vue";
+import LoginView from "@/features/auth/LoginView.vue";
+import GenerationWorkspaceView from "@/features/generation/GenerationWorkspaceView.vue";
+import { useAuthStore } from "@/stores/auth";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { path: "/", redirect: "/inspiration" },
-    { path: "/inspiration", component: ScaffoldView, props: { title: "Inspiration" } },
-    {
-      path: "/inspiration/:slug",
-      component: ScaffoldView,
-      props: { title: "Inspiration detail" },
-    },
-    { path: "/login", component: ScaffoldView, props: { title: "Login" } },
-    { path: "/generate", component: ScaffoldView, props: { title: "Generation workspace" } },
-    {
-      path: "/generate/:sessionId",
-      component: ScaffoldView,
-      props: { title: "Generation session" },
-    },
+    { path: "/inspiration", component: InspirationGalleryView },
+    { path: "/inspiration/:slug", component: InspirationDetailView },
+    { path: "/login", component: LoginView },
+    { path: "/generate", component: GenerationWorkspaceView, props: true, meta: { requiresAuth: true } },
+    { path: "/generate/:sessionId", component: GenerationWorkspaceView, props: true, meta: { requiresAuth: true } },
   ],
+});
+
+router.beforeEach(async (to) => {
+  if (!to.meta.requiresAuth) return true;
+  const auth = useAuthStore();
+  if (auth.loading) await auth.loadSession();
+  if (auth.session?.authenticated) return true;
+  return { path: "/login", query: { returnTo: to.fullPath } };
 });
 
 export default router;
