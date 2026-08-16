@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: dream-space-api
+  profiles:
+    default: api
+
+server:
+  port: ${API_PORT:4000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

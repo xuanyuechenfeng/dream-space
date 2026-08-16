@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: dream-space-worker
+  profiles:
+    default: worker
+  main:
+    web-application-type: none
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:local-mock-key}
+      base-url: ${OPENAI_BASE_URL:http://localhost:8089}
+      chat:
+        options:
+          model: ${OPENAI_MODEL:local-mock-model}
+
+dream-space:
+  external-services-mode: ${EXTERNAL_SERVICES_MODE:mock}

@@ -1,0 +1,9 @@
+packages:
+  - web
+  - admin
+
+confirmModulesPurge: false
+
+allowBuilds:
+  esbuild: true
+  vue-demi: true

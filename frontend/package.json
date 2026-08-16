@@ -1,0 +1,9 @@
+{
+  "name": "dream-space-frontend",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "build": "pnpm --recursive build",
+    "typecheck": "pnpm --recursive typecheck"
+  }
+}

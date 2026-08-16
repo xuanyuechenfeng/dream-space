@@ -1,0 +1,26 @@
+# Frontend
+node_modules/
+dist/
+*.tsbuildinfo
+.pnpm-store/
+
+# Backend
+target/
+*.log
+.maven-home/
+
+# Local runtime
+.env
+.env.local
+.local/
+
+# Editors and operating systems
+.idea/
+.claude/
+.DS_Store
+Thumbs.db
+
+# Trellis runtime/bootstrap files. Versioned task records remain visible.
+.trellis/*
+!.trellis/tasks/
+!.trellis/tasks/**
