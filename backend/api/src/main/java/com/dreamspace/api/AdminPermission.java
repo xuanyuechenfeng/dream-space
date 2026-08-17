@@ -1,6 +1,6 @@
 package com.dreamspace.api;
 
-import com.dreamspace.persistence.database.DatabaseEnums.AdminRole;
+import com.dreamspace.common.persistence.database.DatabaseEnums.AdminRole;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;

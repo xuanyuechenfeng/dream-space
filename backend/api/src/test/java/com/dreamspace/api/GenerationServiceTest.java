@@ -11,18 +11,18 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.dreamspace.persistence.config.DreamSpaceProperties;
-import com.dreamspace.persistence.database.DatabaseEnums.GenerationRatio;
-import com.dreamspace.persistence.database.DatabaseEnums.GenerationResolution;
-import com.dreamspace.persistence.database.DatabaseEnums.GenerationTaskStatus;
-import com.dreamspace.persistence.database.DatabaseEnums.ModerationStatus;
-import com.dreamspace.persistence.generation.GenerationMapper;
-import com.dreamspace.persistence.generation.GenerationSessionRecord;
-import com.dreamspace.persistence.generation.GenerationTaskRecord;
-import com.dreamspace.persistence.quota.QuotaAccountRecord;
-import com.dreamspace.persistence.quota.QuotaTransactionService;
-import com.dreamspace.persistence.storage.ObjectStorage;
-import com.dreamspace.persistence.storage.ObjectStorageFactory;
+import com.dreamspace.common.persistence.config.DreamSpaceProperties;
+import com.dreamspace.common.persistence.database.DatabaseEnums.GenerationRatio;
+import com.dreamspace.common.persistence.database.DatabaseEnums.GenerationResolution;
+import com.dreamspace.common.persistence.database.DatabaseEnums.GenerationTaskStatus;
+import com.dreamspace.common.persistence.database.DatabaseEnums.ModerationStatus;
+import com.dreamspace.common.persistence.generation.GenerationMapper;
+import com.dreamspace.common.persistence.generation.GenerationSessionRecord;
+import com.dreamspace.common.persistence.generation.GenerationTaskRecord;
+import com.dreamspace.common.persistence.quota.QuotaAccountRecord;
+import com.dreamspace.common.persistence.quota.QuotaTransactionService;
+import com.dreamspace.common.persistence.storage.ObjectStorage;
+import com.dreamspace.common.persistence.storage.ObjectStorageFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.List;
@@ -88,7 +88,7 @@ class GenerationServiceTest {
   void mapsDatabaseEnumsToLowercaseContractValues() {
     GenerationMapper mapper = mock(GenerationMapper.class);
     when(mapper.findTask("task-1")).thenReturn(task("prompt", "request-key-123", 1, GenerationResolution.K2, new ObjectMapper()));
-    when(mapper.listResults("task-1")).thenReturn(List.of(new com.dreamspace.persistence.generation.GenerationResultRecord(
+    when(mapper.listResults("task-1")).thenReturn(List.of(new com.dreamspace.common.persistence.generation.GenerationResultRecord(
         "result-1", "task-1", 0, "/results/task-1/result-1.webp", "results/task-1/result-1.webp",
         "thumbnails/task-1/result-1.webp", "checksum", 100, 100, "image/webp", 100, 50, 50, 20,
         ModerationStatus.APPROVED, true, Instant.parse("2026-08-17T00:00:00Z"))));

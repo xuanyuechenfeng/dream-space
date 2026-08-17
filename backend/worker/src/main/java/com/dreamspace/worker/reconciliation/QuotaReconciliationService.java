@@ -1,10 +1,10 @@
 package com.dreamspace.worker.reconciliation;
 
-import com.dreamspace.persistence.database.DatabaseEnums.GenerationTaskStatus;
-import com.dreamspace.persistence.generation.GenerationTaskRecord;
-import com.dreamspace.persistence.quota.QuotaAccountRecord;
-import com.dreamspace.persistence.reconciliation.QuotaReconciliationMapper;
-import com.dreamspace.persistence.reconciliation.QuotaReconciliationRunRecord;
+import com.dreamspace.common.persistence.database.DatabaseEnums.GenerationTaskStatus;
+import com.dreamspace.common.persistence.generation.GenerationTaskRecord;
+import com.dreamspace.common.persistence.quota.QuotaAccountRecord;
+import com.dreamspace.worker.persistence.reconciliation.QuotaReconciliationMapper;
+import com.dreamspace.common.persistence.reconciliation.QuotaReconciliationRunRecord;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;

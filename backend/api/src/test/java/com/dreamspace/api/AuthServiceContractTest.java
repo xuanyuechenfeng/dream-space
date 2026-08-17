@@ -3,8 +3,8 @@ package com.dreamspace.api;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
-import com.dreamspace.persistence.auth.AuthMapper;
-import com.dreamspace.persistence.config.DreamSpaceProperties;
+import com.dreamspace.api.persistence.auth.AuthMapper;
+import com.dreamspace.common.persistence.config.DreamSpaceProperties;
 import org.junit.jupiter.api.Test;
 
 class AuthServiceContractTest {

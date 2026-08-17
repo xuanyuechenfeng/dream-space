@@ -1,9 +1,9 @@
 package com.dreamspace.worker.generation;
 
-import com.dreamspace.persistence.database.DatabaseEnums.GenerationTaskStatus;
-import com.dreamspace.persistence.generation.GenerationMapper;
-import com.dreamspace.persistence.generation.GenerationTaskRecord;
-import com.dreamspace.persistence.quota.QuotaTransactionService;
+import com.dreamspace.common.persistence.database.DatabaseEnums.GenerationTaskStatus;
+import com.dreamspace.common.persistence.generation.GenerationMapper;
+import com.dreamspace.common.persistence.generation.GenerationTaskRecord;
+import com.dreamspace.common.persistence.quota.QuotaTransactionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.List;

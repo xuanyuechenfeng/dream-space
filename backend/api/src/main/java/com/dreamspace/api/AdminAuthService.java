@@ -1,7 +1,7 @@
 package com.dreamspace.api;
 
-import com.dreamspace.persistence.admin.*;
-import com.dreamspace.persistence.config.DreamSpaceProperties;
+import com.dreamspace.api.persistence.admin.*;
+import com.dreamspace.common.persistence.config.DreamSpaceProperties;
 import java.time.*;
 import java.util.List;
 import java.util.UUID;
@@ -37,7 +37,7 @@ public class AdminAuthService {
   public void logout(String token) { if (token != null) mapper.deleteSession(AuthService.hash(token)); }
   public record Result(SessionResponse response, String token, Instant expiresAt) {}
   private AdminView view(AdminUserRecord a) {
-    List<String> permissions = a.role() == com.dreamspace.persistence.database.DatabaseEnums.AdminRole.VIEWER
+    List<String> permissions = a.role() == com.dreamspace.common.persistence.database.DatabaseEnums.AdminRole.VIEWER
         ? List.of("tasks:read", "inspirations:read")
         : List.of("tasks:read", "inspirations:read", "inspirations:write");
     return new AdminView(a.id(), a.displayName(), maskPhone(a.phone()), a.role().name().toLowerCase(), permissions);

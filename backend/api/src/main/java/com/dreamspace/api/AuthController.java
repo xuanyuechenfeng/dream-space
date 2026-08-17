@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/auth")
 public class AuthController {
   private final AuthService service; private final boolean secure;
-  public AuthController(AuthService service, com.dreamspace.persistence.config.DreamSpaceProperties props) { this.service = service; this.secure = props.isProduction(); }
+  public AuthController(AuthService service, com.dreamspace.common.persistence.config.DreamSpaceProperties props) { this.service = service; this.secure = props.isProduction(); }
   @PostMapping("/codes") AuthService.CodeResponse codes(@RequestBody AuthService.CodeRequest body) { return service.sendCode(body); }
   @PostMapping("/login") AuthService.SessionResponse login(@RequestBody AuthService.LoginRequest body, HttpServletResponse response) { var result = service.login(body); CookieSupport.set(response, CookieSupport.USER, result.token(), java.time.Duration.between(java.time.Instant.now(), result.expiresAt()), secure); return result.response(); }
   @GetMapping("/session") AuthService.SessionResponse session(HttpServletRequest request) { return service.session(CookieSupport.read(request, CookieSupport.USER)); }

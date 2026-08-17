@@ -1,8 +1,8 @@
 package com.dreamspace.api;
 
-import com.dreamspace.persistence.storage.ObjectStorage;
-import com.dreamspace.persistence.storage.ObjectStorageFactory;
-import com.dreamspace.persistence.upload.*;
+import com.dreamspace.common.persistence.storage.ObjectStorage;
+import com.dreamspace.common.persistence.storage.ObjectStorageFactory;
+import com.dreamspace.api.persistence.upload.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;

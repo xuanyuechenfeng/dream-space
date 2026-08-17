@@ -1,6 +1,6 @@
 package com.dreamspace.api;
 
-import com.dreamspace.persistence.database.DatabaseEnums.AdminRole;
+import com.dreamspace.common.persistence.database.DatabaseEnums.AdminRole;
 
 public record AdminPrincipal(String id, String displayName, AdminRole role) {
   public boolean allows(AdminRole minimum) {

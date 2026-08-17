@@ -1,6 +1,6 @@
 package com.dreamspace.api;
 
-import com.dreamspace.persistence.inspiration.*;
+import com.dreamspace.api.persistence.inspiration.*;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.http.HttpStatus;

@@ -1,7 +1,7 @@
 package com.dreamspace.api;
 
-import com.dreamspace.persistence.admin.AdminApplicationMapper;
-import com.dreamspace.persistence.inspiration.InspirationRecord;
+import com.dreamspace.api.persistence.admin.AdminApplicationMapper;
+import com.dreamspace.api.persistence.inspiration.InspirationRecord;
 import java.net.URI;
 import java.time.Instant;
 import java.util.List;

@@ -1,6 +1,6 @@
 package com.dreamspace.api;
 
-import com.dreamspace.persistence.database.DatabaseEnums.AdminRole;
+import com.dreamspace.common.persistence.database.DatabaseEnums.AdminRole;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;

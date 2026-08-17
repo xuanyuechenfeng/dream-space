@@ -6,10 +6,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.dreamspace.persistence.database.DatabaseEnums.GenerationRatio;
-import com.dreamspace.persistence.database.DatabaseEnums.GenerationResolution;
-import com.dreamspace.persistence.queue.GenerationJob;
-import com.dreamspace.persistence.storage.ObjectStorage;
+import com.dreamspace.common.persistence.database.DatabaseEnums.GenerationRatio;
+import com.dreamspace.common.persistence.database.DatabaseEnums.GenerationResolution;
+import com.dreamspace.common.persistence.queue.GenerationJob;
+import com.dreamspace.common.persistence.storage.ObjectStorage;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;

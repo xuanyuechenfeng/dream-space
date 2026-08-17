@@ -1,8 +1,6 @@
 package com.dreamspace.worker.generation;
 
-import com.dreamspace.persistence.config.DreamSpaceProperties;
-import com.dreamspace.persistence.queue.GenerationQueue;
-import com.dreamspace.persistence.queue.RedisGenerationQueue;
+import com.dreamspace.common.persistence.config.DreamSpaceProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import org.springframework.ai.chat.model.ChatModel;
@@ -10,15 +8,9 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.core.StringRedisTemplate;
 
 @Configuration
 public class GenerationWorkerConfiguration {
-  @Bean
-  GenerationQueue redisGenerationQueue(StringRedisTemplate redis, DreamSpaceProperties properties) {
-    return new RedisGenerationQueue(redis, properties);
-  }
-
   @Bean
   GenerationProvider generationProvider(DreamSpaceProperties properties,
       ObjectProvider<ChatModel> chatModels, ObjectMapper json,

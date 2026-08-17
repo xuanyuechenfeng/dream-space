@@ -4,11 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.dreamspace.persistence.admin.AdminMapper;
-import com.dreamspace.persistence.admin.AdminSessionRecord;
-import com.dreamspace.persistence.admin.AdminUserRecord;
-import com.dreamspace.persistence.config.DreamSpaceProperties;
-import com.dreamspace.persistence.database.DatabaseEnums.AdminRole;
+import com.dreamspace.api.persistence.admin.AdminMapper;
+import com.dreamspace.api.persistence.admin.AdminSessionRecord;
+import com.dreamspace.api.persistence.admin.AdminUserRecord;
+import com.dreamspace.common.persistence.config.DreamSpaceProperties;
+import com.dreamspace.common.persistence.database.DatabaseEnums.AdminRole;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 

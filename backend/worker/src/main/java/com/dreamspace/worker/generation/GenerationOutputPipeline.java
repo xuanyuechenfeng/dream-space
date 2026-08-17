@@ -1,6 +1,6 @@
 package com.dreamspace.worker.generation;
 
-import com.dreamspace.persistence.storage.ObjectStorage;
+import com.dreamspace.common.persistence.storage.ObjectStorage;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;

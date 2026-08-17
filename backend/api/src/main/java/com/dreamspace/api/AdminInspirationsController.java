@@ -1,6 +1,6 @@
 package com.dreamspace.api;
 
-import com.dreamspace.persistence.database.DatabaseEnums.AdminRole;
+import com.dreamspace.common.persistence.database.DatabaseEnums.AdminRole;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;

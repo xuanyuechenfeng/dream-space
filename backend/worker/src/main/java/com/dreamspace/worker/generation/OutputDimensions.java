@@ -1,7 +1,7 @@
 package com.dreamspace.worker.generation;
 
-import com.dreamspace.persistence.database.DatabaseEnums.GenerationRatio;
-import com.dreamspace.persistence.database.DatabaseEnums.GenerationResolution;
+import com.dreamspace.common.persistence.database.DatabaseEnums.GenerationRatio;
+import com.dreamspace.common.persistence.database.DatabaseEnums.GenerationResolution;
 
 public record OutputDimensions(int width, int height) {
   public static OutputDimensions resolve(GenerationRatio ratio, GenerationResolution resolution) {

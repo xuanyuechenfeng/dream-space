@@ -1,8 +1,8 @@
 package com.dreamspace.worker.generation;
 
-import com.dreamspace.persistence.config.DreamSpaceProperties;
-import com.dreamspace.persistence.queue.GenerationJob;
-import com.dreamspace.persistence.queue.GenerationQueue;
+import com.dreamspace.common.persistence.config.DreamSpaceProperties;
+import com.dreamspace.common.persistence.queue.GenerationJob;
+import com.dreamspace.common.persistence.queue.GenerationQueue;
 import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
 import java.net.UnknownHostException;

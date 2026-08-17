@@ -1,10 +1,10 @@
 package com.dreamspace.api;
 
-import com.dreamspace.persistence.auth.AuthMapper;
-import com.dreamspace.persistence.auth.UserRecord;
-import com.dreamspace.persistence.auth.UserSessionRecord;
-import com.dreamspace.persistence.auth.VerificationCodeRecord;
-import com.dreamspace.persistence.config.DreamSpaceProperties;
+import com.dreamspace.api.persistence.auth.AuthMapper;
+import com.dreamspace.api.persistence.auth.UserRecord;
+import com.dreamspace.api.persistence.auth.UserSessionRecord;
+import com.dreamspace.api.persistence.auth.VerificationCodeRecord;
+import com.dreamspace.common.persistence.config.DreamSpaceProperties;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;

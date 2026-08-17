@@ -1,6 +1,6 @@
 package com.dreamspace.api;
 
-import static com.dreamspace.persistence.database.DatabaseEnums.*;
+import static com.dreamspace.common.persistence.database.DatabaseEnums.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -10,8 +10,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.dreamspace.persistence.admin.AdminApplicationMapper;
-import com.dreamspace.persistence.inspiration.InspirationRecord;
+import com.dreamspace.api.persistence.admin.AdminApplicationMapper;
+import com.dreamspace.api.persistence.inspiration.InspirationRecord;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 

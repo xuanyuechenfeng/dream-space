@@ -1,13 +1,13 @@
 package com.dreamspace.api;
 
-import com.dreamspace.persistence.admin.AdminApplicationMapper;
-import com.dreamspace.persistence.admin.AdminDeadLetterRecord;
-import com.dreamspace.persistence.admin.AdminReconciliationFindingRecord;
-import com.dreamspace.persistence.admin.AdminTaskRecord;
-import com.dreamspace.persistence.generation.GenerationResultRecord;
-import com.dreamspace.persistence.reconciliation.QuotaReconciliationRunRecord;
-import com.dreamspace.persistence.storage.ObjectStorage;
-import com.dreamspace.persistence.storage.ObjectStorageFactory;
+import com.dreamspace.api.persistence.admin.AdminApplicationMapper;
+import com.dreamspace.api.persistence.admin.AdminDeadLetterRecord;
+import com.dreamspace.api.persistence.admin.AdminReconciliationFindingRecord;
+import com.dreamspace.api.persistence.admin.AdminTaskRecord;
+import com.dreamspace.common.persistence.generation.GenerationResultRecord;
+import com.dreamspace.common.persistence.reconciliation.QuotaReconciliationRunRecord;
+import com.dreamspace.common.persistence.storage.ObjectStorage;
+import com.dreamspace.common.persistence.storage.ObjectStorageFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Instant;
 import java.time.LocalDate;

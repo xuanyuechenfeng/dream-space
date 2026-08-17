@@ -1,10 +1,10 @@
 package com.dreamspace.api;
 
-import com.dreamspace.persistence.config.DreamSpaceProperties;
-import com.dreamspace.persistence.generation.GenerationMapper;
-import com.dreamspace.persistence.generation.GenerationTaskRecord;
-import com.dreamspace.persistence.queue.GenerationJob;
-import com.dreamspace.persistence.queue.GenerationQueue;
+import com.dreamspace.common.persistence.config.DreamSpaceProperties;
+import com.dreamspace.common.persistence.generation.GenerationMapper;
+import com.dreamspace.common.persistence.generation.GenerationTaskRecord;
+import com.dreamspace.common.persistence.queue.GenerationJob;
+import com.dreamspace.common.persistence.queue.GenerationQueue;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
