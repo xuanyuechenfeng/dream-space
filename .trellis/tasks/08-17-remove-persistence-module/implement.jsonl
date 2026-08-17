@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend guideline entry point and documentation language requirements"}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"Module and package boundary guidance for the backend restructure"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Database mapper and migration guidance relevant to relocating persistence code"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Backend testing and quality expectations"}
+{"file":".trellis/tasks/08-17-remove-persistence-module/research/dependency-map.md","reason":"Evidence-based class ownership, configuration split, and test migration map"}

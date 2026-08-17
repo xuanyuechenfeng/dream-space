@@ -29,7 +29,8 @@
     "08-16-admin-api-application",
     "08-16-quality-regression",
     "08-16-operations-cutover",
-    "08-16-legacy-retirement"
+    "08-16-legacy-retirement",
+    "08-17-remove-persistence-module"
   ],
   "parent": null,
   "relatedFiles": [],
