@@ -17,35 +17,35 @@ Controller 不直接拼 SQL、不直接写 Redis、不直接调用 ChatModel。�
 | Controller | 方法 | 路径 | 认证 |
 | --- | --- | --- | --- |
 | `HealthController` | GET | `/health` | 无 |
-| `AuthController` | POST | `/auth/codes` | 无 |
-|  | POST | `/auth/login` | 无 |
-|  | GET | `/auth/session` | 用户 Cookie |
-|  | POST | `/auth/logout` | 用户 Cookie |
-| `InspirationsController` | GET | `/inspirations` | 无 |
-|  | GET | `/inspirations/{slug}` | 无 |
-| `UploadsController` | POST | `/uploads/references` | 用户 Cookie |
-|  | GET | `/uploads/references/{uploadId}/content` | 用户 Cookie |
-| `GenerationController` | GET | `/generation/quota` | 用户 Cookie |
-|  | GET | `/generation/options` | 用户 Cookie |
-|  | GET | `/generation/sessions` | 用户 Cookie |
-|  | GET/PATCH/DELETE | `/generation/sessions/{sessionId}` | 用户 Cookie |
-|  | PATCH | `/generation/sessions/{sessionId}/draft` | 用户 Cookie |
-|  | POST | `/generation/tasks` | 用户 Cookie |
-|  | GET | `/generation/tasks/{taskId}` | 用户 Cookie |
-|  | POST | `/generation/tasks/{taskId}/cancel` | 用户 Cookie |
-|  | GET | `/generation/tasks/{taskId}/events` | 用户 Cookie，SSE |
-|  | GET | `/generation/results/{resultId}/content` | 用户 Cookie |
-|  | GET | `/generation/results/{resultId}/thumbnail` | 用户 Cookie |
-| `AdminAuthController` | POST/GET | `/admin/auth/codes`, `/admin/auth/session` | 管理员 Cookie/无 |
-|  | POST | `/admin/auth/login`、`/admin/auth/logout` | 管理员 Cookie |
-| `AdminTasksController` | GET | `/admin/tasks` | 管理员 RBAC |
-|  | GET | `/admin/tasks/{taskId}` | 管理员 RBAC |
-|  | GET | `/admin/tasks/results/{resultId}/{kind}` | 管理员 RBAC |
-|  | GET | `/admin/tasks/reconciliation/runs` | 管理员 RBAC |
-| `AdminInspirationsController` | GET/POST | `/admin/inspirations` | 管理员 RBAC |
-|  | GET/PATCH | `/admin/inspirations/{id}` | 管理员 RBAC |
-|  | POST | `/admin/inspirations/{id}/publish` | OPERATOR/ADMIN |
-|  | POST | `/admin/inspirations/{id}/unpublish` | OPERATOR/ADMIN |
+| `AuthController` | POST | `/dream_web/auth/codes` | 无 |
+|  | POST | `/dream_web/auth/login` | 无 |
+|  | GET | `/dream_web/auth/session` | 用户 Cookie |
+|  | POST | `/dream_web/auth/logout` | 用户 Cookie |
+| `InspirationsController` | GET | `/dream_web/inspirations` | 无 |
+|  | GET | `/dream_web/inspirations/{slug}` | 无 |
+| `UploadsController` | POST | `/dream_web/uploads/references` | 用户 Cookie |
+|  | GET | `/dream_web/uploads/references/{uploadId}/content` | 用户 Cookie |
+| `GenerationController` | GET | `/dream_web/generation/quota` | 用户 Cookie |
+|  | GET | `/dream_web/generation/options` | 用户 Cookie |
+|  | GET | `/dream_web/generation/sessions` | 用户 Cookie |
+|  | GET/PATCH/DELETE | `/dream_web/generation/sessions/{sessionId}` | 用户 Cookie |
+|  | PATCH | `/dream_web/generation/sessions/{sessionId}/draft` | 用户 Cookie |
+|  | POST | `/dream_web/generation/tasks` | 用户 Cookie |
+|  | GET | `/dream_web/generation/tasks/{taskId}` | 用户 Cookie |
+|  | POST | `/dream_web/generation/tasks/{taskId}/cancel` | 用户 Cookie |
+|  | GET | `/dream_web/generation/tasks/{taskId}/events` | 用户 Cookie，SSE |
+|  | GET | `/dream_web/generation/results/{resultId}/content` | 用户 Cookie |
+|  | GET | `/dream_web/generation/results/{resultId}/thumbnail` | 用户 Cookie |
+| `AdminAuthController` | POST/GET | `/manage_web/auth/codes`, `/manage_web/auth/session` | 管理员 Cookie/无 |
+|  | POST | `/manage_web/auth/login`、`/manage_web/auth/logout` | 管理员 Cookie |
+| `AdminTasksController` | GET | `/manage_web/tasks` | 管理员 RBAC |
+|  | GET | `/manage_web/tasks/{taskId}` | 管理员 RBAC |
+|  | GET | `/manage_web/tasks/results/{resultId}/{kind}` | 管理员 RBAC |
+|  | GET | `/manage_web/tasks/reconciliation/runs` | 管理员 RBAC |
+| `AdminInspirationsController` | GET/POST | `/manage_web/inspirations` | 管理员 RBAC |
+|  | GET/PATCH | `/manage_web/inspirations/{id}` | 管理员 RBAC |
+|  | POST | `/manage_web/inspirations/{id}/publish` | OPERATOR/ADMIN |
+|  | POST | `/manage_web/inspirations/{id}/unpublish` | OPERATOR/ADMIN |
 
 ## 3.3 统一响应与错误
 
@@ -81,7 +81,7 @@ Controller 不直接拼 SQL、不直接写 Redis、不直接调用 ChatModel。�
 
 ### 结果访问
 
-根据 result -> task -> user 归属校验；本地模式流式返回 `image/webp`，S3 模式返回 TTL 受限的签名 URL或由 API 代理，禁止暴露任意 object key。
+根据 result -> task -> user 归属校验；local 和 SFTP 模式均由 API 流式返回 `image/webp`，禁止暴露任意 object key 或存储凭据。
 
 ## 3.6 参数校验
 

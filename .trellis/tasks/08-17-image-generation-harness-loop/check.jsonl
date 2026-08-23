@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/directory-structure.md","reason":"Check module ownership and package placement for API, Worker, and common changes."}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Check additive migrations, quoted identifiers, mapper ownership, and transaction boundaries."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Check error propagation, redaction, retries, and terminal-state behavior."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Run the repository quality and regression checklist for the complete change set."}
+{"file": "docs/design/13-frontend-worker-real-implementation.md", "reason": "Acceptance source for F-01..F-04 and W-01..W-05"}

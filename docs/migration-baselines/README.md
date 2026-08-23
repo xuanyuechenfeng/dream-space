@@ -30,9 +30,9 @@ rg -n "generationQueueName|GENERATION_QUEUE|objectKey|thumbnailObjectKey" bak/ap
 For a running local legacy stack, capture each required state with the Playwright CLI. The command must use a fixture database, `EXTERNAL_SERVICES_MODE=mock`, a fixed clock, and the viewport matrix in `routes-and-visuals.md`:
 
 ```powershell
-pnpm exec playwright screenshot --device="Desktop Chrome" http://localhost:3000/inspiration docs/migration-baselines/screenshots/web-inspiration-1440.png
-pnpm exec playwright screenshot --device="iPhone 13" http://localhost:3000/inspiration docs/migration-baselines/screenshots/web-inspiration-390.png
-pnpm exec playwright screenshot --device="Desktop Chrome" http://localhost:3001/tasks docs/migration-baselines/screenshots/admin-tasks-1440.png
+npx playwright screenshot --device="Desktop Chrome" http://localhost:3000/inspiration docs/migration-baselines/screenshots/web-inspiration-1440.png
+npx playwright screenshot --device="iPhone 13" http://localhost:3000/inspiration docs/migration-baselines/screenshots/web-inspiration-390.png
+npx playwright screenshot --device="Desktop Chrome" http://localhost:3001/tasks docs/migration-baselines/screenshots/admin-tasks-1440.png
 ```
 
 Screenshots are review artifacts, not source inputs. Do not commit screenshots containing credentials or personal data.

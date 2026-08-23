@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const ignored = new Set([".git", ".m2repo", ".pnpm-store", "node_modules", "target", "dist", "playwright-report", "test-results"]);
+const ignored = new Set([".git", ".m2repo", "node_modules", "target", "dist", "playwright-report", "test-results"]);
 const extensions = new Set([".java", ".ts", ".vue", ".js", ".mjs", ".cjs", ".json", ".yml", ".yaml", ".md", ".properties", ".xml", ".css", ".html"]);
 
 function files(directory, result = []) {
@@ -41,17 +41,17 @@ for (const path of files(root)) {
   }
 }
 
-const webCss = readFileSync(join(root, "frontend/web/src/styles.css"), "utf8");
-const adminCss = readFileSync(join(root, "frontend/admin/src/styles.css"), "utf8");
+const webCss = readFileSync(join(root, "dream_web/src/styles.css"), "utf8");
+const adminCss = readFileSync(join(root, "manage_web/src/styles.css"), "utf8");
 for (const token of ["#f7f8f9", "#ffffff", "#17191c", "#0e8f7c", "#0f1012", "#f3f5f6"]) {
-  if (!webCss.toLowerCase().includes(token)) failures.push(`frontend/web/src/styles.css: missing theme token ${token}`);
+  if (!webCss.toLowerCase().includes(token)) failures.push(`dream_web/src/styles.css: missing theme token ${token}`);
 }
 for (const token of ["#f4f6f7", "#ffffff", "#1b1f23", "#087766", "#bb3e46"]) {
-  if (!adminCss.toLowerCase().includes(token)) failures.push(`frontend/admin/src/styles.css: missing theme token ${token}`);
+  if (!adminCss.toLowerCase().includes(token)) failures.push(`manage_web/src/styles.css: missing theme token ${token}`);
 }
-const preferences = readFileSync(join(root, "frontend/web/src/stores/preferences.ts"), "utf8");
+const preferences = readFileSync(join(root, "dream_web/src/stores/preferences.ts"), "utf8");
 for (const marker of ['"zh"', '"en"', '"system"', '"light"', '"dark"']) {
-  if (!preferences.includes(marker)) failures.push(`frontend/web/src/stores/preferences.ts: missing locale/theme marker ${marker}`);
+  if (!preferences.includes(marker)) failures.push(`dream_web/src/stores/preferences.ts: missing locale/theme marker ${marker}`);
 }
 
 const base = process.env.QUALITY_BASE_REF || "origin/feature/refactor-admin-application";

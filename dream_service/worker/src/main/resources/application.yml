@@ -1,0 +1,154 @@
+server:
+  # Worker 不提供业务 HTTP API；-1 禁用主应用端口，健康检查和指标只走 management.server.port。
+  port: ${WORKER_SERVER_PORT:-1}
+
+spring:
+  application:
+    # 服务名称，用于日志和运行时服务标识。
+    name: dream-space-worker
+  profiles:
+    # 未显式指定 spring.profiles.active 时启用 Worker 默认配置。
+    default: worker
+  main:
+    # Worker 不暴露业务路由，但以 Servlet Web 应用运行以提供管理端口健康检查和指标。
+    web-application-type: servlet
+  datasource:
+    # Worker 使用的 JDBC 地址；优先读取 DATABASE_JDBC_URL，其次兼容 DATABASE_URL，最后使用本地 PostgreSQL。
+    url: ${DATABASE_JDBC_URL:${DATABASE_URL:jdbc:postgresql://localhost:5432/dream_space}}
+    # PostgreSQL 登录账号。
+    username: ${DATABASE_USER:dream_space}
+    # PostgreSQL 登录密码；本地默认留空，非本地环境必须通过 Secret 注入。
+    password: ${DATABASE_PASSWORD:123456}
+  ai:
+    openai:
+      # 规划与评估多模态模型密钥；必须通过 Secret 注入，不提供本地默认值。
+      api-key: sk-38b4c9e45039cf9a12873eaa2aae27bca41d32b00ae17da7720e88344a72b3b7
+      # 必须填写 OpenAI-compatible API 根地址，例如 https://provider.example/v1。
+      # Spring AI 会在此地址后追加 /chat/completions；不要填写完整接口 URL。
+      base-url: https://api.honglin.asia/v1
+      # Spring AI 客户端单次请求超时。
+      timeout: ${AI_PLANNING_TIMEOUT:PT600S}
+      chat:
+        options:
+          # 发送给 OpenAI-compatible ChatModel 的模型名称。
+          model: gpt-5.6-sol
+          # 规划、评估和审核请求使用的采样温度。
+          temperature: ${AI_PLANNING_TEMPERATURE:0.2}
+  data:
+    redis:
+      # Spring Data Redis 连接地址，供 Redis Stream 队列实现使用。
+      url: ${REDIS_URL:redis://localhost:6379}
+
+dream-space:
+  redis:
+    # Redis 连接地址，用于生成任务 Stream 和依赖就绪检查。
+    url: ${REDIS_URL:redis://localhost:6379}
+    # Worker 消费的 Redis Stream 名称，必须与 API 发布端一致。
+    stream: generation
+    # Worker 所属的 Redis Stream 消费者组名称。
+    consumer-group: generation-workers
+    # pending 消息被其他 Worker 重新认领前的最短空闲时间，使用 ISO-8601 Duration 格式。
+    reclaim-idle: ${REDIS_RECLAIM_IDLE:PT30S}
+  storage:
+    # Worker 支持 local 本地落盘，也支持远程 SFTP；两种模式均使用真实 AI 模型。
+    mode: ${OBJECT_STORAGE_MODE:local}
+    local-directory: ${LOCAL_STORAGE_DIR:D:/softDesign/dream-space/storage}
+    sftp:
+      host: ${SFTP_HOST:}
+      port: ${SFTP_PORT:22}
+      username: ${SFTP_USERNAME:}
+      password: ${SFTP_PASSWORD:}
+      private-key-file: ${SFTP_PRIVATE_KEY_FILE:}
+      private-key-passphrase: ${SFTP_PRIVATE_KEY_PASSPHRASE:}
+      known-hosts-file: ${SFTP_KNOWN_HOSTS_FILE:}
+      strict-host-key-checking: ${SFTP_STRICT_HOST_KEY_CHECKING:true}
+      root-directory: ${SFTP_ROOT_DIRECTORY:/dream-space}
+      connect-timeout: ${SFTP_CONNECT_TIMEOUT:PT10S}
+      operation-timeout: ${SFTP_OPERATION_TIMEOUT:PT60S}
+      max-attempts: ${SFTP_MAX_ATTEMPTS:3}
+  queue:
+    # 单个生成任务允许的最大处理尝试次数，达到上限后进入 dead-letter。
+    max-attempts: ${QUEUE_MAX_ATTEMPTS:3}
+    # 队列重试退避基准配置，使用 ISO-8601 Duration 格式；当前为后续重试调度保留。
+    retry-backoff: ${QUEUE_RETRY_BACKOFF:PT0.5S}
+  auth:
+    # 共享认证配置中的验证码有效期，单位为秒；Worker 当前不直接签发验证码。
+    code-ttl-seconds: ${AUTH_CODE_TTL_SECONDS:300}
+    # 共享认证配置中的 Cookie 会话有效期，单位为天；Worker 当前不直接创建会话。
+    session-days: ${AUTH_SESSION_DAYS:30}
+    # 共享认证配置中的图形验证码有效期；Worker 当前不签发验证码。
+    captcha-ttl-seconds: ${AUTH_CAPTCHA_TTL_SECONDS:300}
+    # 共享认证配置中的验证码最大错误次数；Worker 当前不校验验证码。
+    captcha-max-attempts: ${AUTH_CAPTCHA_MAX_ATTEMPTS:5}
+    # 共享认证配置中的验证码每分钟发放上限；Worker 当前不签发验证码。
+    captcha-issue-limit-per-minute: ${AUTH_CAPTCHA_ISSUE_LIMIT_PER_MINUTE:10}
+  quota:
+    # 共享额度配置中的新用户初始点数；Worker 当前不创建额度账户，值应与 API 保持一致。
+    initial-total: ${QUOTA_INITIAL_TOTAL:100}
+  ai:
+    planning:
+      # 是否启用真实多模态规划与评估模型；关闭会阻止 Worker 启动。
+      enabled: ${AI_PLANNING_ENABLED:true}
+      # 单个规划阶段允许的最大调用次数。
+      max-attempts: ${AI_PLANNING_MAX_ATTEMPTS:2}
+    image:
+      # 是否启用真实图片模型；关闭会阻止 Worker 启动。
+      enabled: ${AI_IMAGE_ENABLED:true}
+      # 图片模型适配器类型，当前支持 openai-compatible。
+      provider: ${AI_IMAGE_PROVIDER:openai-compatible}
+      # 图片生成服务根地址，不复用规划 ChatModel 地址。
+      base-url: https://api.honglin.asia
+      # 图片模型独立密钥；禁止与规划密钥在日志或响应中输出。
+      api-key: sk-38b4c9e45039cf9a12873eaa2aae27bca41d32b00ae17da7720e88344a72b3b7
+      # 专用图片生成模型名称。
+      model: gpt-image-2
+      # OpenAI-compatible 图片生成接口路径。
+      endpoint: ${AI_IMAGE_ENDPOINT:/v1/images/generations}
+      # 图片生成请求超时，使用 ISO-8601 Duration 格式。
+      timeout: ${AI_IMAGE_TIMEOUT:PT600S}
+      # 图片供应商临时错误允许的最大尝试次数。
+      max-attempts: ${AI_IMAGE_MAX_ATTEMPTS:3}
+    harness:
+      # 单个任务允许的最大生成-评估循环次数。
+      max-loop-iterations: ${GENERATION_MAX_LOOP_ITERATIONS:3}
+      # 评估分数达到该阈值且无硬性缺陷时接受结果。
+      accept-score: ${GENERATION_ACCEPT_SCORE:0.8}
+      # 规划模型要求澄清时是否直接终止任务。
+      fail-on-clarification: ${GENERATION_FAIL_ON_CLARIFICATION:false}
+      # 规划 Artifact 的默认保留天数。
+      artifact-retention-days: ${GENERATION_ARTIFACT_RETENTION_DAYS:7}
+  worker:
+    # 是否启用生成任务消费和额度对账调度。
+    enabled: ${WORKER_ENABLED:true}
+    # Worker 启动后首次轮询 Redis Stream 前的等待时间，单位为毫秒。
+    initial-delay-ms: ${WORKER_INITIAL_DELAY_MS:1000}
+    # 每轮 Redis Stream 消费完成后的固定等待时间，单位为毫秒。
+    poll-delay-ms: ${WORKER_POLL_DELAY_MS:500}
+    # 供应商图片下载客户端的连接超时，使用 ISO-8601 Duration 格式。
+    provider-timeout: ${PROVIDER_TIMEOUT:PT30S}
+    # 每次额度对账覆盖的历史时间窗口，单位为毫秒。
+    reconciliation-window-ms: ${RECONCILIATION_WINDOW_MS:3600000}
+    # Worker 启动后首次执行额度对账前的等待时间，单位为毫秒。
+    reconciliation-initial-delay-ms: ${RECONCILIATION_INITIAL_DELAY_MS:60000}
+    # 两次额度对账任务之间的固定等待时间，单位为毫秒。
+    reconciliation-delay-ms: ${RECONCILIATION_DELAY_MS:3600000}
+
+    # Model readiness is probed independently from queue polling.
+    model-health:
+      initial-delay-ms: ${WORKER_MODEL_HEALTH_INITIAL_DELAY_MS:0}
+      fixed-delay-ms: ${WORKER_MODEL_HEALTH_FIXED_DELAY_MS:1800000}
+management:
+  # Worker 的管理端口仅用于健康检查和指标，不暴露业务 HTTP API。
+  server:
+    port: ${WORKER_MANAGEMENT_PORT:4010}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,persistenceReadiness,workerModel,workerStartup

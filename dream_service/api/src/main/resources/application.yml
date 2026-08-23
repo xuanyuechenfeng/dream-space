@@ -1,0 +1,83 @@
+spring:
+  application:
+    # 服务名称，用于日志、Actuator 信息和运行时服务标识。
+    name: dream-space-api
+  profiles:
+    # 未显式指定 spring.profiles.active 时启用 API 默认配置。
+    default: api
+  datasource:
+    # API 使用的 JDBC 地址；优先读取 DATABASE_JDBC_URL，其次兼容 DATABASE_URL，最后使用本地 PostgreSQL。
+    url: ${DATABASE_JDBC_URL:${DATABASE_URL:jdbc:postgresql://localhost:5432/dream_space}}
+    # PostgreSQL 登录账号。
+    username: ${DATABASE_USER:dream_space}
+    # PostgreSQL 登录密码；本地默认留空，非本地环境必须通过 Secret 注入。
+    password: ${DATABASE_PASSWORD:123456}
+  servlet:
+    multipart:
+      # 单个上传文件的最大体积，当前用于限制参考图上传。
+      max-file-size: 10MB
+      # 单次 multipart 请求的最大体积，防止请求体无限增长。
+      max-request-size: 10MB
+
+server:
+  # API HTTP 监听端口。
+  port: ${API_PORT:4000}
+
+dream-space:
+  redis:
+    # Redis 连接地址，用于生成任务 Stream。
+    url: ${REDIS_URL:redis://localhost:6379}
+    # 生成任务使用的 Redis Stream 名称，API 将任务发布到该 Stream。
+    stream: generation
+    # Redis Stream 消费者组名称，必须与 Worker 使用的值一致。
+    consumer-group: generation-workers
+    # pending 消息允许被 Worker 重新认领前的最短空闲时间，使用 ISO-8601 Duration 格式。
+    reclaim-idle: ${REDIS_RECLAIM_IDLE:PT30S}
+  storage:
+    # 存储模式：local 使用本地目录，sftp 使用远程 SFTP 服务器。
+    mode: ${OBJECT_STORAGE_MODE:local}
+    local-directory: ${LOCAL_STORAGE_DIR:D:/softDesign/dream-space/storage}
+    sftp:
+      host: ${SFTP_HOST:}
+      port: ${SFTP_PORT:22}
+      username: ${SFTP_USERNAME:}
+      password: ${SFTP_PASSWORD:}
+      private-key-file: ${SFTP_PRIVATE_KEY_FILE:}
+      private-key-passphrase: ${SFTP_PRIVATE_KEY_PASSPHRASE:}
+      known-hosts-file: ${SFTP_KNOWN_HOSTS_FILE:}
+      strict-host-key-checking: ${SFTP_STRICT_HOST_KEY_CHECKING:true}
+      root-directory: ${SFTP_ROOT_DIRECTORY:/dream-space}
+      connect-timeout: ${SFTP_CONNECT_TIMEOUT:PT10S}
+      operation-timeout: ${SFTP_OPERATION_TIMEOUT:PT60S}
+      max-attempts: ${SFTP_MAX_ATTEMPTS:3}
+  queue:
+    # 单个生成任务允许的最大处理尝试次数，API 会写入队列消息供 Worker 执行。
+    max-attempts: ${QUEUE_MAX_ATTEMPTS:3}
+    # 队列重试退避基准配置，使用 ISO-8601 Duration 格式；当前为后续重试调度保留。
+    retry-backoff: ${QUEUE_RETRY_BACKOFF:PT0.5S}
+  auth:
+    # 用户和管理员短信验证码的有效期，单位为秒。
+    code-ttl-seconds: ${AUTH_CODE_TTL_SECONDS:300}
+    # 用户和管理员 Cookie 会话的有效期，单位为天。
+    session-days: ${AUTH_SESSION_DAYS:30}
+    # 图形验证码的有效期，单位为秒；答案只保存哈希，不返回给前端。
+    captcha-ttl-seconds: ${AUTH_CAPTCHA_TTL_SECONDS:300}
+    # 单个图形验证码允许的错误次数，达到上限后挑战失效。
+    captcha-max-attempts: ${AUTH_CAPTCHA_MAX_ATTEMPTS:5}
+    # 同一客户端每分钟最多申请的图形验证码数量。
+    captcha-issue-limit-per-minute: ${AUTH_CAPTCHA_ISSUE_LIMIT_PER_MINUTE:10}
+  quota:
+    # 新用户首次创建额度账户时授予的初始点数。
+    initial-total: ${QUOTA_INITIAL_TOTAL:100}
+  security:
+    # 是否为会话 Cookie 设置 Secure 属性；部署在 HTTPS 反向代理后时应显式设为 true。
+    secure-cookies: ${COOKIE_SECURE:false}
+    # 允许携带 Cookie 跨域访问 API 的 Origin 列表，多个地址使用英文逗号分隔；留空表示不注册 CORS 规则。
+    allowed-origins: ${WEB_ORIGIN:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # 通过 Actuator HTTP 端点公开健康检查和服务信息。
+        include: health,info

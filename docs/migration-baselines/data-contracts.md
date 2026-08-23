@@ -41,11 +41,11 @@ The current queue names are `foundation-health` and `image-generation` (`bak/app
 
 ## Object Keys and Assets
 
-- Uploaded reference: `references/{userId}/{uuid}.webp`; public API path `/uploads/references/{uploadId}/content`.
+- Uploaded reference: `references/{userId}/{uuid}.webp`; public API path `/dream_web/uploads/references/{uploadId}/content`.
 - Result content: `results/{taskId}/{resultId}.webp`.
 - Result thumbnail: `thumbnails/{taskId}/{resultId}.webp`.
-- User result API paths: `/generation/results/{resultId}/content` and `/thumbnail`.
-- Admin result API paths: `/admin/tasks/results/{resultId}/content` and `/thumbnail`.
+- User result API paths: `/dream_web/generation/results/{resultId}/content` and `/thumbnail`.
+- Admin result API paths: `/manage_web/tasks/results/{resultId}/content` and `/thumbnail`.
 
 Stored output is normalized WebP with checksum, width, height, MIME type, byte size, and thumbnail metadata. Object storage can be local or S3-compatible; the key, ownership check, signed URL TTL, and cleanup behavior must remain stable.
 

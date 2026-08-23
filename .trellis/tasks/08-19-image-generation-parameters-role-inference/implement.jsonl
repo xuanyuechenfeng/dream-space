@@ -1,0 +1,9 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend module conventions and entry point."}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"PostgreSQL enum, JSONB, MyBatis and immutable migration rules."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"API and Worker failure contract guidance."}
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend project conventions and entry point."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Vue component and accessibility guidance."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Pinia draft and server-state guidance."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"TypeScript boundary and validation guidance."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Cross-layer contract consistency for UI, API, database and Worker."}
+{"file":"docs/design/15-image-generation-parameters-and-image-role-inference.md","reason":"User-approved authoritative technical design."}

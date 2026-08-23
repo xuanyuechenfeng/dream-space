@@ -2,7 +2,7 @@
 
 ## 2.1 应用与路由
 
-`frontend/web` 和 `frontend/admin` 是两个独立 Vite 应用，分别部署在 3000/3001 或统一域名的 `/`、`/admin` 路径。路由必须与 `bak` 保持一致：
+`dream_web` 和 `manage_web` 是两个独立 Vite 应用，分别部署在 3000/3001，统一域名入口前缀分别为 `/dream_web/`、`/manage_web/`。应用内部页面路由保持原有路径，Vite `base` 负责入口前缀：
 
 | 应用 | 路径 | 视图 | 主要状态 |
 | --- | --- | --- | --- |
@@ -12,15 +12,15 @@
 | web | `/login` | `LoginView` | phone、challenge、code、agreements、legal |
 | web | `/generate` | `GenerationWorkspaceView` | session、draft、tasks、filters、SSE |
 | web | `/generate/:sessionId` | `GenerationWorkspaceView` | sessionId、draft、task timeline |
-| admin | `/` | `AdminHomeRedirectView` | 重定向 `/tasks` |
-| admin | `/login` | `AdminLoginView` | phone、challenge、countdown、error |
-| admin | `/tasks` | `AdminTasksView` | filters、page、detail、reconciliation |
-| admin | `/inspirations` | `AdminInspirationsView` | filters、editor、status、page |
+| manage_web | `/` | `AdminHomeRedirectView` | 重定向 `/tasks` |
+| manage_web | `/login` | `AdminLoginView` | phone、challenge、countdown、error |
+| manage_web | `/tasks` | `AdminTasksView` | filters、page、detail、reconciliation |
+| manage_web | `/inspirations` | `AdminInspirationsView` | filters、editor、status、page |
 
 ## 2.2 代码结构
 
 ```text
-frontend/web/src/
+dream_web/src/
 ├── main.ts
 ├── App.vue
 ├── router/index.ts
@@ -128,6 +128,6 @@ frontend/web/src/
 
 ## 2.6 构建与验收
 
-Vite 必须配置严格 TypeScript、路径别名、`/api` proxy、资源 base 和 source map 策略。开发命令分别为 `pnpm --dir frontend/web dev`、`pnpm --dir frontend/admin dev`；生产构建输出 `dist/`，由 Nginx 或对象存储托管。
+Vite 必须配置严格 TypeScript、路径别名、`/api` proxy、资源 base 和 source map 策略。开发命令分别为 `npm --prefix dream_web run dev`、`npm --prefix manage_web run dev`；生产构建输出 `dist/`，由 Nginx 或对象存储托管。
 
 前台合并条件：旧页面与新页面在 1440x900、1024x768、390x844 三个视口截图通过；所有交互测试通过；axe 无新增严重无障碍问题；不存在重复 DOM id、缺失目标、未处理 Promise 或硬编码 API 地址。

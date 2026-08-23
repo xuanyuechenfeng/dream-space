@@ -1,0 +1,52 @@
+groups:
+  - name: dream-space-worker
+    rules:
+      - alert: DreamSpaceWorkerQueueBacklog
+        expr: dreamspace_worker_queue_pending > 100
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Dream Space generation queue backlog is growing
+      - alert: DreamSpaceGenerationDeadLetters
+        expr: increase(dreamspace_generation_dead_letter_total[15m]) > 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Dream Space generation dead letters exceeded the threshold
+      - alert: DreamSpaceModelLatencyP95
+        expr: histogram_quantile(0.95, sum by (le, provider, model, stage) (rate(dreamspace_model_request_duration_seconds_bucket[5m]))) > 30
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Dream Space model request P95 latency is above 30 seconds
+      - alert: DreamSpaceImageProcessingLatencyP95
+        expr: histogram_quantile(0.95, sum by (le, operation) (rate(dreamspace_image_processing_duration_seconds_bucket[5m]))) > 10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Dream Space image processing P95 latency is above 10 seconds
+      - alert: DreamSpaceObjectCleanupFailure
+        expr: increase(dreamspace_object_cleanup_failure_total[10m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Dream Space failed to clean up an object
+      - alert: DreamSpaceQuotaReconciliationBlocked
+        expr: dreamspace_quota_reconciliation_blocked > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Dream Space quota reconciliation has blocked findings
+      - alert: DreamSpaceModerationSla
+        expr: dreamspace_moderation_pending > 100
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: Dream Space moderation queue exceeded its service level target

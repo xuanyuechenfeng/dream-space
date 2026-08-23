@@ -15,18 +15,17 @@ flowchart LR
   WORKER --> AI[Spring AI ChatModel]
 ```
 
-API 和 Worker 采用同一 Maven 多模块工程、两个运行 profile。API 只负责同步 HTTP、事务和队列投递；Worker 只负责异步任务执行、图片处理、结果落盘和额度结算。两者共享 `common`、`persistence` 和契约模块，但不共享进程状态。
+API 和 Worker 采用同一 Maven 多模块工程、两个运行 profile。API 只负责同步 HTTP、事务和队列投递；Worker 只负责异步任务执行、图片处理、结果落盘和额度结算。两者共享 `common` 中的持久化基础设施与契约，但不共享进程状态。
 
 ## 1.2 目标目录
 
 ```text
-frontend/
-├── web/                     # 用户端 Vue 3 + Vite 5
-└── admin/                   # 管理端 Vue 3 + Vite 5
-backend/
+.
+├── dream_web/                     # 用户端 Vue 3 + Vite 5
+└── manage_web/                   # 管理端 Vue 3 + Vite 5
+dream_service/
 ├── pom.xml                  # Maven parent
 ├── common/                  # domain、DTO、错误码、状态机
-├── persistence/             # MyBatis Mapper、Redis、S3 adapter
 ├── api/                     # Spring MVC API profile
 └── worker/                  # Worker profile、AI、图片、对账
 docs/design/                 # 本分册
@@ -38,9 +37,8 @@ bak/                         # 原实现，只读
 | 模块 | 允许依赖 | 禁止职责 |
 | --- | --- | --- |
 | `common` | JDK、Jackson、Bean Validation API | 数据库、Redis、HTTP、Spring Bean |
-| `persistence` | common、Spring JDBC/MyBatis、Redis、S3 SDK | Controller、页面业务 |
-| `api` | common、persistence、Spring MVC/Security | 直接调用模型供应商 |
-| `worker` | common、persistence、Spring AI、图像库 | 对外暴露用户 HTTP API |
+| `api` | common、Spring MVC/Security | 直接调用模型供应商 |
+| `worker` | common、Spring AI、图像库 | 对外暴露用户 HTTP API |
 
 ## 1.3 运行模式
 
@@ -48,8 +46,7 @@ bak/                         # 原实现，只读
 | --- | --- | --- |
 | `api` | API 服务 | MVC、鉴权、上传、SSE、队列 producer |
 | `worker` | Worker 服务 | Redis consumer、ChatModel、审核、图像、对账 |
-| `test` | 测试 | Testcontainers 或 fixture adapter，不连接生产资源 |
-| `mock` | API/Worker 可叠加 | 演示验证码、确定性图片 provider、本地对象存储 |
+| `test` | 测试 | Testcontainers 或受控 fixture；不连接生产资源，也不替代真实模型供应商 |
 
 API 和 Worker 必须使用同一 `schemaVersion`、数据库迁移版本和费用规则版本。启动时记录应用版本、Git SHA、profile 和 schema version，便于排查跨服务不一致。
 
@@ -74,4 +71,4 @@ Prisma Client、BullMQ Node client、Sharp 不能直接在 Java 中运行。保�
 
 ## 1.6 依赖与版本锁定
 
-使用 Maven Wrapper 和 dependency management 锁定 Spring Boot 4.0、Spring AI 2.0.0-M5、MyBatis、S3 SDK、Redis、图像库版本。首次脚手架必须用 OpenAI-compatible WireMock 完成编译和一条真实 `ChatModel.call` 集成测试，确认 milestone 与 Boot 4 的 BOM 兼容后才能扩展业务。
+使用 Maven Wrapper 和 dependency management 锁定 Spring Boot 4.0、Spring AI 2.0.0-M5、MyBatis、S3 SDK、Redis、图像库版本。首次脚手架完成编译后，使用真实供应商配置人工确认 `ChatModel.call` 和图片模型契约，再扩展业务。

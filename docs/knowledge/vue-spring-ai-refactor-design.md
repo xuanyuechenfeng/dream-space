@@ -9,13 +9,13 @@
 - 用户端和管理端迁移到 Vue 3、TypeScript、Vite 5。
 - API 和异步生成处理迁移到 Spring Boot 4.0、Spring MVC。
 - 图片模型通过 Spring AI 2.0.0-M5 的 `ChatModel` 接口接入 OpenAI-compatible 服务。
-- 保留 PostgreSQL 17、Redis 8、MinIO/S3、对象键规则、任务状态、额度流水和数据库表语义。
+- 保留 PostgreSQL 17、Redis 8、对象键规则、任务状态、额度流水和数据库表语义；远程对象存储统一使用 SFTP，本地模式保留。
 - 保留现有用户端和管理端路由、功能状态、错误状态、响应式断点、颜色变量、图片素材和交互文案。
 
 ### 1.2 非目标
 
 - 不在本次重构中增加视频、画布、支付、社区、会员或资产管理能力。
-- 不把 mock 验证码和 mock 图片池误认为生产服务；真实短信和模型供应商仍按配置启用。
+- 不把前端 fixture 误认为生产服务；Worker 图片链路只使用真实规划、评估和图片模型，API 不提供演示验证码。
 - 不改变现有表的业务含义、任务费用规则、用户/管理员会话隔离和公开灵感发布规则。
 
 ### 1.3 必须接受的运行时边界
@@ -29,7 +29,7 @@ Prisma Client、BullMQ Node client 和 Sharp 是 Node 运行时组件，不能�
 | Sharp | Java 侧使用 ImageIO/TwelveMonkeys + Thumbnailator，封装成 `ImagePipeline` | JPG/PNG/WebP 校验、EXIF 旋转、裁剪尺寸、WebP 质量、缩略图和 SHA-256 |
 | Next.js App Router | Vue Router + Vite SPA | URL 路径、页面状态、API 请求和视觉契约 |
 
-如果“数据库等技术框架保持不变”包含“必须继续使用 Prisma Client”，则与 Spring Boot 后端目标冲突，需要在实施前确认；本方案默认保持数据库/Redis/S3，而替换 Node-only 客户端。
+如果“数据库等技术框架保持不变”包含“必须继续使用 Prisma Client”，则与 Spring Boot 后端目标冲突，需要在实施前确认；本方案保持数据库/Redis 协议和业务语义，替换 Node-only 客户端，远程对象存储使用 SFTP。
 
 ## 2. 目标总体架构
 
@@ -40,7 +40,7 @@ flowchart LR
   API --> DB[(PostgreSQL 17)]
   API --> Redis[(Redis 8)]
   Redis --> Worker[Spring Boot Worker\nworker profile]
-  API --> Store[(Local FS / MinIO / S3)]
+  API --> Store[(Local FS / SFTP)]
   Worker --> Store
   Worker --> AI[Spring AI 2.0.0-M5\nOpenAI-compatible ChatModel]
   Worker --> DB
@@ -50,13 +50,13 @@ flowchart LR
 
 | 单元 | 技术 | 进程职责 |
 | --- | --- | --- |
-| `web` | Vue 3 + TypeScript + Vite 5 | 用户灵感、登录、生成工作台和结果页 |
-| `admin` | Vue 3 + TypeScript + Vite 5 | 管理员登录、任务查询、灵感管理和额度对账 |
+| `dream_web` | Vue 3 + TypeScript + Vite 5 | 用户灵感、登录、生成工作台和结果页，入口 `/dream_web/` |
+| `manage_web` | Vue 3 + TypeScript + Vite 5 | 管理员登录、任务查询、灵感管理和额度对账，入口 `/manage_web/` |
 | `api` | Spring Boot 4.0 + Spring MVC | REST、Cookie 会话、权限、数据库事务、上传、SSE |
 | `worker` | Spring Boot 4.0 + Spring Data Redis | 消费生成任务、调用 ChatModel、审核、图像处理、额度结算和对账 |
 | PostgreSQL | 17 | 继续承载 18 张业务表 |
 | Redis | 8 | 队列、消费组、短期状态和限流基础 |
-| Object Storage | Local FS / MinIO / S3 | 参考图、结果图和缩略图 |
+| Object Storage | Local FS / SFTP | 参考图、结果图和缩略图 |
 
 API 和 Worker 使用同一 Java 多模块工程更容易共享 DTO、状态机和数据库 Mapper，但部署为两个 profile：`api` 和 `worker`。这样保留原有 API/Worker 的故障隔离和独立扩容能力。
 
@@ -72,9 +72,9 @@ API 和 Worker 使用同一 Java 多模块工程更容易共享 DTO、状态机�
 | Java | JDK 21 LTS（Spring Boot 4 的最低运行基线以最终 BOM 要求为准） |
 | 数据库 | PostgreSQL 17；保留现有 schema、枚举、索引和事务语义 |
 | 缓存/队列 | Redis 8；Spring Data Redis，过渡兼容 BullMQ queue name |
-| 对象存储 | MinIO/AWS S3 兼容 API；本地模式保留 |
+| 对象存储 | SFTP；本地模式保留 |
 | 图片 | ImageIO/TwelveMonkeys、Thumbnailator、SHA-256 |
-| 构建/测试 | Maven Wrapper、Vitest、Playwright、JUnit 5、Testcontainers、WireMock |
+| 构建/测试 | Maven Wrapper、Vitest、Playwright、JUnit 5、Testcontainers；模型人工真实联调 |
 
 ### 3.2 建议目录
 
@@ -82,17 +82,14 @@ API 和 Worker 使用同一 Java 多模块工程更容易共享 DTO、状态机�
 .
 ├── docs/                         # 保留现有设计与迁移文档
 ├── bak/                          # 原工程实现，作为迁移基线和回滚参考
-├── frontend/
-│   ├── web/                      # Vue 用户端 Vite 应用
-│   └── admin/                    # Vue 管理端 Vite 应用
-├── backend/
-│   ├── common/                   # DTO、枚举、状态机、错误码、配置模型
-│   ├── persistence/              # MyBatis Mapper、SQL、事务适配
+├── dream_web/                          # 独立 Vue 用户端工程
+├── manage_web/                        # 独立 Vue 管理端工程
+├── dream_service/
+│   ├── common/                   # 共享模型、MyBatis Mapper、SQL 和基础设施适配
 │   ├── api/                      # Spring MVC Controller、用户业务
 │   ├── worker/                   # Redis consumer、AI、图片和对账任务
 │   └── pom.xml                   # Maven 多模块入口
-├── infrastructure/               # PostgreSQL、Redis、MinIO 配置
-└── e2e/                          # Playwright 跨前台验收
+└── infrastructure/               # PostgreSQL、Redis、SFTP 配置
 ```
 
 `bak/` 在迁移期间只读，不在其中继续开发；每个迁移模块完成后以契约测试和截图对比证明等价，再删除 Node 侧临时适配代码。
@@ -138,7 +135,7 @@ API 和 Worker 使用同一 Java 多模块工程更容易共享 DTO、状态机�
 
 ### 4.3 严格视觉契约
 
-用户端 `bak/apps/web/app/globals.css` 是视觉基线，迁移时应直接提取为 `frontend/web/src/styles/tokens.css` 和 `globals.css`，不重新配色。
+用户端 `bak/apps/web/app/globals.css` 是视觉基线，迁移时应直接提取为 `dream_web/src/styles/tokens.css` 和 `globals.css`，不重新配色。
 
 | 设计项 | 必须保持的值/规则 |
 | --- | --- |
@@ -167,7 +164,7 @@ API 和 Worker 使用同一 Java 多模块工程更容易共享 DTO、状态机�
 ### 4.5 前台实现分层
 
 ```text
-frontend/web/src/
+dream_web/src/
 ├── app/                 # router、App.vue、全局错误/加载边界
 ├── layouts/             # InspirationShell、登录布局
 ├── features/            # auth、inspiration、generation
@@ -184,13 +181,12 @@ API 地址只从 `VITE_API_URL` 读取；不把 token 放进 localStorage。Cook
 ### 5.1 模块边界
 
 ```text
-backend/common
+dream_service/common
 ├── contract/             # 与前端共享的请求/响应 JSON 结构
 ├── domain/               # 状态、费用、额度、权限和生成规则
 └── error/                # 统一错误码和异常响应
-backend/persistence       # PostgreSQL Mapper、Redis、对象存储适配
-backend/api                # Spring MVC Controller + application service
-backend/worker             # Redis consumer + AI/image/moderation pipeline
+dream_service/api                # Spring MVC Controller + application service
+dream_service/worker             # Redis consumer + AI/image/moderation pipeline
 ```
 
 Controller 只做 HTTP 参数绑定、鉴权上下文和响应映射；业务事务放在 application service；Mapper 不承载业务规则。用户和管理员 Cookie 名、哈希策略、过期时间和会话表保持隔离。
@@ -200,17 +196,17 @@ Controller 只做 HTTP 参数绑定、鉴权上下文和响应映射；业务事
 | 现有模块 | Spring MVC Controller | 关键职责 |
 | --- | --- | --- |
 | health | `HealthController` | `/health` 和数据库连通性 |
-| auth | `AuthController` | `/auth/codes`、`/auth/login`、`/auth/session`、`/auth/logout` |
-| inspirations | `InspirationsController` | `/inspirations` 列表和 `/:slug` 详情，仅 PUBLISHED |
-| uploads | `UploadsController` | 参考图上传、内容读取、用户资源鉴权 |
-| generation | `GenerationController` | 选项、额度、会话、草稿、任务、取消、结果资源 |
-| admin auth | `AdminAuthController` | `/admin/auth/*`，独立管理员会话 |
+| auth | `AuthController` | `/dream_web/auth/codes`、`/dream_web/auth/login`、`/dream_web/auth/session`、`/dream_web/auth/logout` |
+| inspirations | `InspirationsController` | `/dream_web/inspirations` 列表和 `/:slug` 详情，仅 PUBLISHED |
+| uploads | `UploadsController` | `/dream_web/uploads/references` 参考图上传、内容读取、用户资源鉴权 |
+| generation | `GenerationController` | `/dream_web/generation/*` 选项、额度、会话、草稿、任务、取消、结果资源 |
+| admin auth | `AdminAuthController` | `/manage_web/auth/*`，独立管理员会话 |
 | admin tasks | `AdminTasksController` | 分页筛选、任务详情、结果、对账 runs |
 | admin inspirations | `AdminInspirationsController` | CRUD、发布和取消发布、RBAC |
 
 ### 5.3 SSE
 
-Spring MVC 使用 `SseEmitter` 实现 `GET /generation/tasks/:taskId/events`：
+Spring MVC 使用 `SseEmitter` 实现 `GET /dream_web/generation/tasks/:taskId/events`：
 
 1. 校验用户对 task/session 的归属。
 2. 从 `after`/`Last-Event-ID` 读取 `GenerationTaskEvent`，先回放再订阅 Redis 事件。
@@ -231,7 +227,7 @@ GenerationService
 
 模型配置至少包含 `base-url`、`api-key`、`model`、超时、最大重试和温度。prompt、参考图描述、输出数量和比例/分辨率通过 `ChatOptions`/请求 metadata 传递；若供应商返回图片 URL 或 base64，由 `ProviderOutputDecoder` 统一转换为 `ProviderImage`。模型不可用、超时、限流和响应格式错误映射为可重试/不可重试的领域错误码。
 
-当前 mock 模式保留 `DeterministicMockProvider` 的可重复素材选择和特殊 prompt 故障注入；真实 ChatModel 与 mock 通过 profile 切换，不能在 Controller 中分支。
+图片生成 Worker 不保留 `DeterministicMockProvider` 或确定性规划/审核实现；真实规划/评估 ChatModel 与独立图片模型必须通过环境变量配置，未配置时 Worker 启动失败。
 
 ### 5.5 Worker 与状态机
 
@@ -261,7 +257,7 @@ Redis Streams 设计：
 
 ### 6.3 对象存储
 
-继续使用 `references/`、`results/`、`thumbnails/` 三类对象键；S3 模式返回短期签名 GET，本地模式由 Spring MVC 代理字节。路径逃逸校验、MIME、大小、WebP 输出和删除补偿必须与 `packages/storage` 行为一致。
+继续使用 `references/`、`results/`、`thumbnails/` 三类对象键；local 和 SFTP 模式均由 Spring MVC 代理字节，不向前端返回存储地址。路径逃逸校验、MIME、大小、WebP 输出和删除补偿必须与 `packages/storage` 行为一致。
 
 ## 7. 配置设计
 
@@ -285,13 +281,13 @@ spring:
           model: ${OPENAI_MODEL}
 ```
 
-业务配置继续支持 `WEB_ORIGIN`、`ADMIN_ORIGIN`、`AUTH_CODE_TTL_SECONDS`、`AUTH_SESSION_DAYS`、`OBJECT_STORAGE_MODE`、S3 参数、`MOCK_GENERATION_DELAY_MS`、对账开关和间隔。生产密钥只通过环境变量/密钥管理系统注入，不进入 `application.yml`。
+业务配置继续支持 `WEB_ORIGIN`、`ADMIN_ORIGIN`、`AUTH_CODE_TTL_SECONDS`、`AUTH_SESSION_DAYS`、`OBJECT_STORAGE_MODE`、`LOCAL_STORAGE_DIR` 和 `SFTP_*` 参数、`MOCK_GENERATION_DELAY_MS`、对账开关和间隔。生产密钥只通过环境变量/密钥管理系统注入，不进入 `application.yml`。
 
 ### 7.2 Vite 配置
 
 - `VITE_API_URL`：API 基地址。
 - `VITE_WEB_URL`、`VITE_ADMIN_URL`：回跳和跨应用链接。
-- `VITE_EXTERNAL_SERVICES_MODE`：页面显示 mock/真实模式提示，仅用于展示，不承担安全判断。
+- Cookie 安全属性由 API 的 `COOKIE_SECURE` 显式配置；前端不显示外部服务运行模式。
 - Vite dev server 用 proxy 转发 `/api` 或完整 API URL，生产构建使用反向代理统一域名和 Cookie。
 
 ## 8. 迁移步骤
@@ -299,7 +295,7 @@ spring:
 1. **契约冻结**：从 `bak` 固化路由、JSON、错误码、任务状态、额度规则、CSS token 和图片素材清单；建立 API contract tests。
 2. **前台壳迁移**：先迁移两个 Vue/Vite 应用的布局、路由、颜色变量和静态页面，截图对比通过后接入 API。
 3. **Java 基础层**：建立 Maven 多模块、统一异常、Cookie 会话、MyBatis Mapper、Redis 和对象存储 adapter；先接 health/inspirations/auth。
-4. **生成链路**：接入会话/任务/额度事务、SSE、Redis consumer、mock provider，再接 Spring AI ChatModel。
+4. **生成链路**：接入会话/任务/额度事务、SSE、Redis consumer、真实多模态规划/评估模型和独立图片模型。
 5. **管理端迁移**：接入管理员 RBAC、任务详情/对账、灵感 CRUD 和发布。
 6. **双栈验收**：旧 Node API 与 Java API 对同一测试 fixture 返回结构对比；前台 Playwright 同一用例执行桌面/移动端截图对比。
 7. **切换与回滚**：按 API 网关流量切换，保留 Node 服务和 Redis bridge 一个发布周期；发现任务状态、额度或图片差异时立即切回。
@@ -321,18 +317,18 @@ spring:
 - 2K/4K、1-8 张图片、参考图上限、输入/输出审核失败和 provider 重试行为一致。
 - 成功 consume、失败/取消 release、dead-letter 和对账补偿的金额与原实现一致。
 - OpenAI-compatible ChatModel 的超时、限流、空响应和格式错误都有稳定错误码与重试策略。
-- 本地对象存储和 S3/MinIO 的 content、thumbnail、signed URL 行为一致。
+- 本地对象存储和 SFTP 的 content、thumbnail、HTTP 二进制代理行为一致。
 
 ## 10. 风险与待确认项
 
 | 风险/问题 | 处理建议 |
 | --- | --- |
-| Spring Boot 4.0 与 Spring AI 2.0.0-M5 的最终 BOM/API 兼容性 | 在脚手架阶段锁定 BOM，使用 OpenAI-compatible mock 做编译和集成验证 |
+| Spring Boot 4.0 与 Spring AI 2.0.0-M5 的最终 BOM/API 兼容性 | 在脚手架阶段锁定 BOM，使用真实供应商配置人工验证 |
 | Prisma 不能在 Java 中运行 | 保留 schema/SQL，采用 MyBatis/JDBC；若必须 Prisma，需要保留 Node persistence service，不建议嵌入 Java |
 | BullMQ 与 Spring Data Redis 消费协议不同 | 过渡期使用 bridge；新任务切 Streams，旧 pending 任务由 bridge 清空 |
 | Sharp 与 Java 图像编码差异 | 用固定输入 fixture 对比尺寸、方向、WebP 字节属性和缩略图；必要时保留独立图像处理服务 |
 | 旧前端的本地状态/占位入口 | 先按现状复刻，不在重构中擅自补充点赞、通知、分享等后端能力 |
-| 迁移后根目录只有 `docs` 和 `bak` | 新代码应建立在明确的 `frontend/`、`backend/` 目录，不直接修改 `bak`；完成后补根目录 README 和忽略规则 |
+| 迁移后根目录只有 `docs` 和 `bak` | 新代码应建立在明确的 `dream_web/`、`manage_web/`、`dream_service/` 目录，不直接修改 `bak`；完成后补根目录 README 和忽略规则 |
 
 ## 11. 结论
 

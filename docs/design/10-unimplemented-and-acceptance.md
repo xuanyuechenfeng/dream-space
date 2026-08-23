@@ -4,25 +4,25 @@
 
 ## 10.0 质量回归完成记录
 
-- 后端 Maven 全量测试通过：39 项通过；PostgreSQL、Redis Testcontainers 在本机 Docker 不可用时明确跳过，CI 环境 Docker 不可用则失败。
-- 前端 typecheck、生产构建、Vitest 5 项测试通过；Playwright web/admin 共 15 项，在不更新基线模式下连续两轮全部通过。
-- web 基线覆盖 1440x900、1024x768、390x844；admin 基线覆盖 1440x900、800x1024、390x844。截图使用视口尺寸，固定导航不会被 full-page 拼接位置污染。
-- 门禁脚本检查凭据模式、Vue 重复 id、`for`/ARIA 目标、主题与中英文标记以及 `bak` 不可变性；应用内浏览器复核 web/admin 页面控制台无错误。
-- 仍未宣称生产就绪：真实 PostgreSQL/Redis/S3、供应商 WireMock、监控告警、备份恢复和灰度回滚必须在 CI/运维任务中完成。
+- 后端已在 JDK 21 下通过 Maven 全量测试和打包；PostgreSQL 17、Redis 8、SFTP 集成服务在本机 Docker 不可用时明确跳过，CI 环境 Docker 不可用则失败。
+- 前端 dream_web/manage_web 的 typecheck 和生产构建通过。Playwright 已删除 API 路由拦截，只在 `RUN_REAL_E2E=1` 且真实 API/Worker/模型环境已启动时执行；当前无真实环境，因此 18 项视口场景明确跳过，不能计为业务通过。
+- Worker 使用格式完整但不可达的 live 配置实际启动后，仅开放 `4010` 管理端口；readiness 返回 HTTP 503/DOWN，Prometheus 返回 HTTP 200，默认业务端口不可达。
+- 旧截图只能作为历史参考；真实任务状态、800x1024、中英文长文本及 `bak` 对照仍需在真实联调环境重新采集。
+- 仍未宣称生产就绪：真实供应商联调、完整生成 E2E、备份恢复和灰度回滚必须在 CI/运维任务中完成。
 
 ## 10.1 当前已具备
 
-- Vue web/admin 的 Vite 入口、路由、TypeScript 配置和代理；web 已完成灵感、详情、登录和生成工作台，admin 已完成登录、任务和灵感管理页面。
-- Spring Boot API/Worker 入口、Actuator health 配置和 persistence 模块。
-- Prisma 迁移 SQL 已复制到 `backend/persistence/src/main/resources/db/migration/`，并保留原始版本顺序。
-- MyBatis 枚举/JSON 类型处理、基础 Mapper record、Redis generation queue 和 local/S3 object storage adapter。
+- Vue dream_web/manage_web 的 Vite 入口、路由、TypeScript 配置和代理；dream_web 已完成灵感、详情、登录和生成工作台，manage_web 已完成登录、任务和灵感管理页面。
+- Spring Boot API/Worker 入口、Actuator health 配置和 common 持久化基础设施。
+- Prisma 迁移 SQL 已复制到 `dream_service/common/src/main/resources/db/migration/`，并保留原始版本顺序。
+- MyBatis 枚举/JSON 类型处理、基础 Mapper record、Redis generation queue 和 local/SFTP object storage adapter。
 - 额度账户 reserve/consume/release 的基础事务服务、对象键白名单和单元测试。
-- API Context、迁移资源、对象键和 Worker ChatModel mock 的基础测试。
+- API Context、迁移资源和对象键的基础测试；Worker 模型由真实供应商人工验收。
 - 用户/管理员独立认证、公开灵感和参考图上传 API，包含资源归属与基础 RBAC。
 - 生成 options、quota、session/draft、task/cancel/retry、result 和 SSE API；任务写入后再发布 Redis，并对未发布任务定时补偿。
 - Web 生成工作台的会话侧栏、参数、参考图、额度、任务时间线、取消/重试、结果预览和下载交互。
 - Worker Redis Stream 消费组、pending reclaim、指数退避、条件抢占、有限重试、死信和终态 ack。
-- 八步生成管线、输入/输出审核端口、确定性 Mock、Spring AI `ChatModel` OpenAI-compatible 适配器和错误分类。
+- Harness 生成管线、输入/输出审核端口、真实多模态规划/评估模型、独立图片模型适配器和错误分类。
 - EXIF 方向处理、cover crop、真实 WebP 主图/缩略图、SHA-256、对象写入补偿和 `(taskId,index)` 幂等结果持久化。
 - 成功/失败额度结算，以及按窗口幂等执行的额度对账；安全缺失结算可修复，金额和账户漂移记录为 `BLOCKED`。
 - 管理员独立 Cookie/session、VIEWER/OPERATOR/ADMIN 服务端 RBAC，以及与用户认证隔离的登录和退出链路。
@@ -36,7 +36,7 @@
 
 1. 使用真实 Worker 完成生成端到端回归，覆盖成功、部分成功、失败、取消、重试和 SSE 断线恢复。
 2. 补齐生成工作台 1440x900、1024x768、800x1024、390x844 截图基线和中英文长文本回归。
-3. 将参考图上传链路也切换到与 Worker 相同的真实 WebP writer；运行时缺少 writer 时必须明确失败。
+3. 参考图上传与 Worker 已统一使用真实 WebP writer，并在 codec 缺失时明确失败；仍需在真实对象存储环境验收异常补偿。
 4. 从 `bak/apps/web` 持续核对 DOM、文案、素材、浅色/深色 token、移动断点和 reduced-motion 行为。
 
 ### 管理端
@@ -48,21 +48,21 @@
 ### API 与安全
 
 1. 补齐验证码/IP 限流、CSRF 防护和生成 JSON schema 校验。
-2. 为 admin task、reconciliation 和 inspiration REST Controller 补齐 OpenAPI 与真实 PostgreSQL 契约测试。
-3. 完成 readiness contributors：PostgreSQL、Redis、对象存储不可用时必须返回不可就绪，不能伪造成功。
+2. 为 manage_web task、reconciliation 和 inspiration REST Controller 补齐 OpenAPI 与真实 PostgreSQL 契约测试。
+3. readiness contributors 已覆盖 PostgreSQL、Redis、对象存储和模型；仍需在真实基础设施环境验证各依赖逐项中断场景。
 
 ### Worker 与模型
 
-1. 使用真实 PostgreSQL + Redis + S3-compatible 存储完成 Worker 集成回归，验证 reclaim、取消竞态、重复投递和数据库事务回滚。
-2. 为 OpenAI-compatible 供应商补充 timeout、429、5xx、401/403 和图片 URL 下载的 WireMock 契约用例，并校验供应商 request ID 脱敏日志。
-3. 接入生产内容审核实现；当前审核端口及确定性 Mock 已具备，生产模式仍需绑定实际审核服务。
-4. 为 S3 client/presigner 配置补充 endpoint、region、credentials、TTL 和部分写入失败的集成测试。
-5. 建立 Worker 指标和告警：pending 数、重试次数、dead-letter 数、模型时延、图片处理时延、清理失败和对账 `BLOCKED` 数。
+1. 使用真实 PostgreSQL + Redis + SFTP 存储完成 Worker 集成回归，验证 reclaim、取消竞态、重复投递和数据库事务回滚。
+2. 使用真实供应商人工验证 timeout、429、5xx、401/403、图片 URL 下载和供应商 request ID 脱敏日志。
+3. 内容审核运营队列、用户申诉、管理员复核和不可变审计已实现；仍需真实 PostgreSQL 与审核模型联调。
+4. SFTP 客户端已统一认证、known_hosts、超时和重试配置；部分写入和网络中断仍需故障注入验收。
+5. Worker 已暴露 pending、尝试、dead-letter、模型时延、图片处理、清理失败、审核和对账指标，并提供 Prometheus 告警规则；阈值仍需按生产容量校准。
 
 ### 工程与运维
 
 1. 补充 Docker Compose、API/Worker/前端镜像、数据库备份、对象生命周期和本地开发 profile。
-2. 建立 OpenAPI/JSON fixtures、Testcontainers PostgreSQL/Redis、WireMock、MockMvc、Vitest 和 Playwright 测试流水线。
+2. 建立 OpenAPI/JSON fixtures、Testcontainers PostgreSQL/Redis、MockMvc、Vitest 和 Playwright 测试流水线；模型供应商通过人工真实配置验收。
 3. 建立视觉截图基线，覆盖 1440x900、1024x768、800x1024、390x844；检查重复 id、缺失 DOM target、主题变量和中英文溢出。
 4. 实现 Node BullMQ bridge、双栈灰度、监控告警和可演练回滚；回滚周期结束后才清理旧运行服务。
 
@@ -74,7 +74,7 @@
 - 任务状态跳跃、SSE 丢事件/越权读取、重复提交重复扣费或额度恒等式破坏。
 - 用户 Cookie 可访问管理接口、VIEWER 可写入、对象 key 可路径穿越或任意资源可读。
 - 真实密钥进入源码、日志、fixture、截图、Git 历史或 API 错误响应。
-- PostgreSQL、Redis、S3 或模型不可用时 readiness 仍返回成功。
+- PostgreSQL、Redis、SFTP 或模型不可用时 readiness 仍返回成功。
 - 缺少迁移回滚方案、生产备份验证或双栈回滚演练。
 
 ## 10.4 功能完成定义

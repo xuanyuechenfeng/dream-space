@@ -14,12 +14,17 @@
 8. [数据库字段级设计](./08-database-schema.md)
 9. [配置文件与一级目录说明](./09-configuration-and-layout.md)
 10. [未实现功能与开发验收清单](./10-unimplemented-and-acceptance.md)
+11. [图片生成 Harness 与 Loop Engineering 详细设计](./11-image-generation-harness-loop.md)
+12. [图片生成真实规划与质量评估设计](./12-real-image-planning-evaluation.md)
+13. [前台用户端与 Worker 未实现功能真实实现方案](./13-frontend-worker-real-implementation.md)
+14. [用户密码与图形验证码登录设计](./14-user-password-captcha-login.md)
+15. [图片生成参数与图片角色自动识别详细设计](./15-image-generation-parameters-and-image-role-inference.md)
 
 ## 实施规则
 
 - 先冻结契约和视觉基线，再并行开发前端、API、Worker；不允许在迁移过程中顺手改变产品交互。
 - 数据库表名、列名、枚举值、幂等键和额度流水语义不可改名；Java 侧只替换访问实现。
-- `bak/` 只读。所有新代码放在 `frontend/` 或 `backend/`，所有迁移说明放在 `docs/`。
+- `bak/` 只读。所有新代码放在 `dream_web/`、`manage_web/` 或 `dream_service/`，所有迁移说明放在 `docs/`。
 - 每个功能必须同时具备：接口契约测试、业务单元测试、关键链路 E2E；前台页面还必须有桌面和移动截图基线。
 - 真实模型、短信和对象存储凭据只通过环境变量或密钥管理系统注入，不能写入源码、测试快照或文档示例。
 - 设计文档以 `08` 的实际字段清单、`09` 的配置约束和 `10` 的未实现清单为开发入口；实现完成后必须同步更新对应分册。

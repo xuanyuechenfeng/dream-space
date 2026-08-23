@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Verify schema, enum, JSONB and migration correctness."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Backend quality review checklist."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Frontend build, behavior and regression review."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Verify frontend contracts remain type-safe."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Verify end-to-end contract fields and validation ownership."}
+{"file":"docs/design/15-image-generation-parameters-and-image-role-inference.md","reason":"Check implementation against approved acceptance criteria."}

@@ -45,12 +45,12 @@ results/<taskId>/<resultId>.webp
 thumbnails/<taskId>/<resultId>.webp
 ```
 
-所有 adapter 共用 `ObjectKeyPolicy`：前缀白名单、字符白名单、扩展名白名单、根目录逃逸检查。Local FS 使用原子临时文件 + rename；S3 使用 PutObject/GetObject/DeleteObject 和短期签名 URL。
+所有 adapter 共用 `ObjectKeyPolicy`：前缀白名单、字符白名单、扩展名白名单、根目录逃逸检查。Local FS 和 SFTP 均使用原子临时文件 + rename；API 通过 HTTP 代理读取二进制内容，不暴露后端存储凭据或签名 URL。
 
 上传原图先写临时 key，数据库成功后转正；任务结果先写主图再缩略图，任一步失败执行清理。删除必须幂等，404 不阻塞业务补偿。
 
 ## 5.5 配置和基础设施
 
-API/Worker 环境变量保持旧名称：`DATABASE_URL`、`REDIS_URL`、`OBJECT_STORAGE_MODE`、`LOCAL_STORAGE_DIR`、S3 参数、`AUTH_CODE_TTL_SECONDS`、`AUTH_SESSION_DAYS`、`QUOTA_RECONCILIATION_*`。新增：`OPENAI_BASE_URL`、`OPENAI_API_KEY`、`OPENAI_MODEL`、`OPENAI_TIMEOUT_MS`、`OPENAI_MAX_ATTEMPTS`。
+API/Worker 环境变量保持 `DATABASE_URL`、`REDIS_URL`、`OBJECT_STORAGE_MODE`、`LOCAL_STORAGE_DIR`、`AUTH_CODE_TTL_SECONDS`、`AUTH_SESSION_DAYS`、`QUOTA_RECONCILIATION_*`；远程存储改用 `SFTP_*` 参数（host、port、username、password/private-key、known-hosts、root、timeout、attempts）。新增：`OPENAI_BASE_URL`、`OPENAI_API_KEY`、`OPENAI_MODEL`、`OPENAI_TIMEOUT_MS`、`OPENAI_MAX_ATTEMPTS`。
 
-Docker Compose 继续提供 PostgreSQL 17、Redis 8、MinIO；新增 API/Worker/前台构建镜像，健康检查分别调用 `/health/live`、`/health/ready`。生产不把 `.env` 打入镜像。
+Docker Compose 提供 PostgreSQL 17 和 Redis 8；SFTP 由独立服务器提供，local 模式使用 API/Worker 共享挂载目录。新增 API/Worker/前台构建镜像，健康检查分别调用 `/health/live`、`/health/ready`。生产不把 `.env` 打入镜像。

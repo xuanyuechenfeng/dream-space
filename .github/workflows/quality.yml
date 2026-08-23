@@ -39,31 +39,37 @@ jobs:
       - name: Unit, contract and Testcontainers suites
         env:
           CI: "true"
-        run: ./backend/mvnw -B -f backend/pom.xml test
+        run: ./dream_service/mvnw -B -f dream_service/pom.xml test
 
   frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.19.0
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-      - run: pnpm --dir frontend install --frozen-lockfile
-      - run: pnpm --dir frontend typecheck
-      - run: pnpm --dir frontend build
-      - run: pnpm --dir frontend test:unit
-      - run: pnpm --dir frontend exec playwright install --with-deps chromium
-      - run: pnpm --dir frontend test:e2e
+          cache: npm
+          cache-dependency-path: |
+            dream_web/package-lock.json
+            manage_web/package-lock.json
+      - run: npm --prefix dream_web ci
+      - run: npm --prefix manage_web ci
+      - run: npm --prefix dream_web run typecheck
+      - run: npm --prefix manage_web run typecheck
+      - run: npm --prefix dream_web run build
+      - run: npm --prefix manage_web run build
+      - run: npm --prefix dream_web run test:unit
+      - run: npm --prefix manage_web run test:unit
+      - run: npm --prefix dream_web exec playwright install --with-deps chromium
+      - run: npm --prefix dream_web run test:e2e
+      - run: npm --prefix manage_web run test:e2e
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-report
           path: |
-            frontend/playwright-report
-            frontend/test-results
+            dream_web/playwright-report
+            dream_web/test-results
+            manage_web/playwright-report
+            manage_web/test-results
           if-no-files-found: ignore

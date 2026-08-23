@@ -33,7 +33,7 @@ QUEUED
 ## 4.3 处理管线
 
 1. `TaskClaimStep`：读取任务、检查状态和 attempt 幂等键，写 `task.generating/task.retrying`。
-2. `InputModerationStep`：执行 mock 或真实审核，拒绝则写 input moderation 和失败/释放。
+2. `InputModerationStep`：调用真实多模态审核模型，拒绝则写 input moderation 和失败/释放。
 3. `ModelInvokeStep`：构造 Spring AI prompt/options，调用 `ChatModel`，解析图片 URL/base64。
 4. `OutputModerationStep`：逐图审核，任一拒绝则清理临时输出并失败/释放。
 5. `ImagePipelineStep`：EXIF rotate、cover crop、输出目标尺寸、WebP quality 90、缩略图最大宽 480/quality 80、SHA-256。
@@ -59,11 +59,11 @@ interface GenerationModel {
 - `base-url` 指向 OpenAI-compatible 服务；`api-key` 只来自 secret；model、timeout、temperature、maxTokens 可配置。
 - 使用固定 system prompt 约束输出协议；要求模型返回可解析的图片引用或 base64，不接受自由文本作为成功结果。
 - 将供应商错误映射为 `retryable`、`code`、`providerRequestId`；日志只记录 requestId/providerRequestId。
-- mock 实现保留旧 deterministic image pool 和 `[mock-retry-once]`、`[mock-always-retryable-error]` 测试语义。
+- Worker 不保留图片生成、规划或审核 Mock；未配置真实供应商时启动失败。
 
 Spring AI milestone 版本 API 可能调整，所有 `ChatModel` 调用集中在一个 adapter 文件和一个集成测试中，禁止在多个业务类散落 milestone-specific API。
 
-当前 Java 实现对应 `OpenAiCompatibleGenerationProvider`。供应商成功响应统一解析为 `images[]`，单项接受 `url`、`data` 或 `base64`；URL 仅允许 HTTP(S)，单图限制 20 MiB。空响应和瞬时 Spring AI 异常可重试，结构错误不可重试。生产接入时不得在响应、日志或 dead-letter 中保存 prompt、密钥或原始供应商错误体。
+当前 Java 实现使用 `OpenAiCompatibleImageGenerationModel`。供应商成功响应统一解析为 `data[]`，单项接受 URL、Data URL 或 Base64；输入参考图使用对象存储字节编码为 Data URL。URL 仅允许 HTTPS 且禁止私网地址，单图限制 20 MiB。空响应和瞬时供应商异常可重试，结构错误不可重试。生产接入时不得在响应、日志或 dead-letter 中保存 prompt、密钥或原始供应商错误体。
 
 ## 4.5 重试与死信
 
@@ -86,9 +86,8 @@ Worker 定时按 windowKey 创建 `QuotaReconciliationRun`，扫描：
 | --- | --- | --- |
 | 队列消费 | `GenerationQueueConsumer`、`RedisGenerationQueue` | 先持久化终态/补偿，再 ack；可重试异常保持 pending |
 | 任务事务 | `JdbcGenerationWorkerStore`、`GenerationMapper` | 条件状态更新、attemptKey 幂等、事件与额度同事务 |
-| 模型调用 | `GenerationProvider`、`OpenAiCompatibleGenerationProvider` | Spring AI API 只出现在适配器；输出先校验再进入图片管线 |
-| Mock | `DeterministicMockProvider`、`DeterministicMockContentModerator` | 相同 prompt/model/index 生成相同输入；故障标记可重复 |
+| 模型调用 | `PlanningModel`、`ChatQualityEvaluationModel`、`OpenAiCompatibleImageGenerationModel` | 规划/评估使用真实多模态 ChatModel，图片模型独立；输出先校验再进入图片管线 |
 | 图片与存储 | `GenerationOutputPipeline` | 主图/缩略图均为真实 WebP；任一步失败清理已写对象 |
 | 对账 | `QuotaReconciliationService`、`QuotaReconciliationMapper` | windowKey/findings/ledger 幂等；不猜测修正金额漂移 |
 
-开发或修改 Worker 时按以下顺序验证：领域单元测试 -> WebP/清理测试 -> Spring AI WireMock -> PostgreSQL/Redis/S3 集成测试 -> API/SSE 端到端测试。没有真实 Redis 时只能证明消费者逻辑可编译和单元行为正确，不能把 reclaim/ack 验收标记为生产通过。
+开发或修改 Worker 时按以下顺序验证：编译检查 -> PostgreSQL/Redis 与 local/SFTP 存储集成检查 -> 使用真实供应商配置人工验证规划、图片生成、质量评估和循环优化 -> API/SSE 端到端验收。

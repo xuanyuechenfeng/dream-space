@@ -1,0 +1,1 @@
+ALTER TABLE "GenerationTask" ALTER COLUMN "mode" SET DEFAULT 'AUTO';

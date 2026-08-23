@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/directory-structure.md","reason":"Keep shared generation persistence in common and application-specific orchestration in api/worker."}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Follow migration, JSONB, mapper, enum, and transaction conventions for plan and iteration facts."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Align stage/provider errors and API failure responses with repository conventions."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Apply backend testing and forbidden-pattern requirements across the cross-module implementation."}
+{"file": "docs/design/13-frontend-worker-real-implementation.md", "reason": "Production completion design for frontend and worker real implementation"}
