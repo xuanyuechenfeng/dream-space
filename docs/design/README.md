@@ -19,6 +19,10 @@
 13. [前台用户端与 Worker 未实现功能真实实现方案](./13-frontend-worker-real-implementation.md)
 14. [用户密码与图形验证码登录设计](./14-user-password-captcha-login.md)
 15. [图片生成参数与图片角色自动识别详细设计](./15-image-generation-parameters-and-image-role-inference.md)
+16. [生成对话框展示设计](./16-generation-dialog-presentation.md)
+17. [生成页面优化设计](./17-generation-page-optimization.md)
+18. [用户账单、用户管理、计费规则与支付订单设计](./18-billing-user-management-and-payments.md)
+19. [管理端运营能力详细设计](./19-admin-operations-capabilities.md)
 
 ## 实施规则
 
