@@ -1,5 +1,6 @@
 package com.dreamspace.api;
 
+import com.dreamspace.common.persistence.database.DatabaseMigrationCommand;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -15,6 +16,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class DreamSpaceApiApplication {
     public static void main(String[] args) {
+        if (java.util.Arrays.asList(args).contains("--migrate-database")) {
+            DatabaseMigrationCommand.migrate();
+            return;
+        }
         SpringApplication.run(DreamSpaceApiApplication.class, args);
     }
 }

@@ -1,6 +1,7 @@
 package com.dreamspace.api.service;
 
 import com.dreamspace.api.common.ApiException;
+import com.dreamspace.api.common.AdminPermissions;
 import com.dreamspace.api.persistence.admin.*;
 import com.dreamspace.common.persistence.config.DreamSpaceProperties;
 import java.time.*;
@@ -38,9 +39,9 @@ public class AdminAuthService {
   public void logout(String token) { if (token != null) mapper.deleteSession(AuthService.hash(token)); }
   public record Result(SessionResponse response, String token, Instant expiresAt) {}
   private AdminView view(AdminUserRecord a) {
-    List<String> permissions = a.role() == com.dreamspace.common.persistence.database.DatabaseEnums.AdminRole.VIEWER
-        ? List.of("tasks:read", "inspirations:read")
-        : List.of("tasks:read", "inspirations:read", "inspirations:write");
+    List<String> permissions = mapper.listPermissionDefinitions(a.id()).stream()
+        .map(AdminPermissionDefinitionRecord::code).filter(AdminPermissions.ALL::contains)
+        .distinct().sorted().toList();
     return new AdminView(a.id(), a.displayName(), maskPhone(a.phone()), a.role().name().toLowerCase(), permissions);
   }
   private static String maskPhone(String phone) { return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4); }

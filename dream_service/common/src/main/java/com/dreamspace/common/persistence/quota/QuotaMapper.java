@@ -17,4 +17,10 @@ public interface QuotaMapper {
   int consume(@Param("userId") String userId, @Param("amount") int amount);
   @Update("UPDATE \"QuotaAccount\" SET \"available\" = \"available\" + #{amount}, \"reserved\" = \"reserved\" - #{amount}, \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"userId\" = #{userId} AND \"reserved\" >= #{amount}")
   int release(@Param("userId") String userId, @Param("amount") int amount);
+
+  @Update("UPDATE \"QuotaAccount\" SET \"total\"=\"total\"+#{amount},\"available\"=\"available\"+#{amount},\"updatedAt\"=CURRENT_TIMESTAMP WHERE \"userId\"=#{userId}")
+  int grant(@Param("userId") String userId, @Param("amount") int amount);
+
+  @Update("UPDATE \"QuotaAccount\" SET \"total\"=\"total\"-#{amount},\"available\"=\"available\"-#{amount},\"updatedAt\"=CURRENT_TIMESTAMP WHERE \"userId\"=#{userId} AND \"available\" >= #{amount} AND \"total\"-#{amount} >= 0")
+  int revoke(@Param("userId") String userId, @Param("amount") int amount);
 }

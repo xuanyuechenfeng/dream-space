@@ -1,6 +1,7 @@
 package com.dreamspace.api.controller;
 
 import com.dreamspace.api.common.AdminPermission;
+import com.dreamspace.api.common.AdminPermissions;
 import com.dreamspace.api.service.AdminTasksService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -13,13 +14,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/manage_web/tasks")
-@AdminPermission
 public class AdminTasksController {
   private final AdminTasksService service;
 
   public AdminTasksController(AdminTasksService service) { this.service = service; }
 
   @GetMapping
+  @AdminPermission(AdminPermissions.TASKS_READ)
   AdminTasksService.Page list(@RequestParam(required = false) String status,
       @RequestParam(required = false) String model, @RequestParam(required = false) String query,
       @RequestParam(required = false) String createdFrom,
@@ -30,15 +31,19 @@ public class AdminTasksController {
   }
 
   @GetMapping("/results/{resultId}/content")
+  @AdminPermission(AdminPermissions.TASKS_READ)
   ResponseEntity<byte[]> content(@PathVariable String resultId) { return binary(resultId, false); }
 
   @GetMapping("/results/{resultId}/thumbnail")
+  @AdminPermission(AdminPermissions.TASKS_READ)
   ResponseEntity<byte[]> thumbnail(@PathVariable String resultId) { return binary(resultId, true); }
 
   @GetMapping("/reconciliation/runs")
+  @AdminPermission(AdminPermissions.TASKS_READ)
   AdminTasksService.ReconciliationResponse reconciliation() { return service.reconciliation(); }
 
   @GetMapping("/{taskId}")
+  @AdminPermission(AdminPermissions.TASKS_READ)
   AdminTasksService.TaskDetail detail(@PathVariable String taskId) { return service.get(taskId); }
 
   private ResponseEntity<byte[]> binary(String resultId, boolean thumbnail) {

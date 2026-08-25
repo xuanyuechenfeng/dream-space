@@ -18,6 +18,8 @@ public interface AuthMapper {
   @Insert("INSERT INTO \"User\" (\"id\",\"phone\",\"createdAt\",\"updatedAt\") VALUES (#{id},#{phone},CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT (\"phone\") DO UPDATE SET \"updatedAt\" = CURRENT_TIMESTAMP")
   int upsertUser(@Param("id") String id, @Param("phone") String phone);
   @Select("SELECT \"id\" FROM \"User\" WHERE \"phone\" = #{phone} LIMIT 1") String findUserIdByPhone(String phone);
+  @Select("SELECT \"status\" FROM \"User\" WHERE \"id\" = #{id} LIMIT 1") String findUserStatusById(String id);
+  @Update("UPDATE \"User\" SET \"lastLoginAt\"=CURRENT_TIMESTAMP,\"updatedAt\"=CURRENT_TIMESTAMP WHERE \"id\"=#{id}") int touchLogin(String id);
 
   @Select("SELECT * FROM \"LoginCaptcha\" WHERE \"id\" = #{id} LIMIT 1")
   LoginCaptchaRecord findLoginCaptcha(String id);

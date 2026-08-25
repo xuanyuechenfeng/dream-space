@@ -41,6 +41,7 @@ onUnmounted(() => { window.removeEventListener("mousedown", closeMenus); window.
 
     <section v-if="accountOpen" class="account-menu" aria-label="Account and settings" @mousedown.stop>
       <button class="menu-row" type="button" @click="legalOpen = true"><FileText aria-hidden="true" />{{ text.legal }}<ChevronRight class="menu-end" aria-hidden="true" /></button>
+      <RouterLink v-if="auth.session?.authenticated" class="menu-row" to="/account" @click="accountOpen = false"><UserRound aria-hidden="true" />账户与账单<ChevronRight class="menu-end" aria-hidden="true" /></RouterLink>
       <button class="menu-row" type="button" disabled><ScrollText aria-hidden="true" />{{ text.changelog }}<span class="menu-end">-</span></button>
       <button class="menu-row" type="button" :aria-expanded="themeOpen" @click="themeOpen = !themeOpen"><SunMoon aria-hidden="true" />{{ text.appearance }}<span class="menu-end">{{ themeLabels[preferences.theme][language] }}</span></button>
       <div v-if="themeOpen" class="theme-options"><button v-for="item in (['system', 'light', 'dark'] as Theme[])" :key="item" class="menu-row" :class="{ active: preferences.theme === item }" type="button" @click="preferences.setTheme(item)">{{ themeLabels[item][language] }}</button></div>

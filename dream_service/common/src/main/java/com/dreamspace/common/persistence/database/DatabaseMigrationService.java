@@ -20,18 +20,24 @@ public class DatabaseMigrationService {
       connection.setAutoCommit(false);
       try {
         connection.createStatement().execute("CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)");
+        connection.commit();
         Resource[] resources = new PathMatchingResourcePatternResolver().getResources("classpath*:db/migration/*.sql");
         Arrays.sort(resources, java.util.Comparator.comparing(Resource::getFilename));
         for (Resource resource : resources) {
           String version = resource.getFilename();
           if (!applied(connection, version)) {
-            ScriptUtils.executeSqlScript(connection, resource);
-            try (var statement = connection.prepareStatement("INSERT INTO schema_migrations(version) VALUES (?)")) {
-              statement.setString(1, version); statement.executeUpdate();
+            try {
+              ScriptUtils.executeSqlScript(connection, resource);
+              try (var statement = connection.prepareStatement("INSERT INTO schema_migrations(version) VALUES (?)")) {
+                statement.setString(1, version); statement.executeUpdate();
+              }
+              connection.commit();
+            } catch (Exception e) {
+              connection.rollback();
+              throw e;
             }
           }
         }
-        connection.commit();
       } catch (Exception e) { connection.rollback(); throw e; }
     } catch (Exception e) { throw new IllegalStateException("database migration failed", e); }
   }

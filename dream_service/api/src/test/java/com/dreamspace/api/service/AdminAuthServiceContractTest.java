@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.dreamspace.api.persistence.admin.AdminMapper;
+import com.dreamspace.api.persistence.admin.AdminPermissionDefinitionRecord;
 import com.dreamspace.api.persistence.admin.AdminSessionRecord;
 import com.dreamspace.api.persistence.admin.AdminUserRecord;
 import com.dreamspace.common.persistence.config.DreamSpaceProperties;
@@ -20,7 +21,11 @@ class AdminAuthServiceContractTest {
     when(mapper.findActiveSession(AuthService.hash(token))).thenReturn(
         new AdminSessionRecord("session", "hash", "admin-1", Instant.now().plusSeconds(60), null, null));
     when(mapper.findActiveById("admin-1")).thenReturn(
-        new AdminUserRecord("admin-1", "18812340000", "审核员", AdminRole.VIEWER, true, null, null));
+        new AdminUserRecord("admin-1", "18812340000", "审核员", AdminRole.VIEWER, true,
+            null, null, 1));
+    when(mapper.listPermissionDefinitions("admin-1")).thenReturn(java.util.List.of(
+        permission("users:read"), permission("tasks:read"), permission("inspirations:read"),
+        permission("billing:read"), permission("pricing:read"), permission("unknown:permission")));
     AdminAuthService service = new AdminAuthService(mapper,
         new DreamSpaceProperties(null, null, null, null, null));
 
@@ -29,6 +34,13 @@ class AdminAuthServiceContractTest {
     assertThat(response.authenticated()).isTrue();
     assertThat(response.user().phoneMasked()).isEqualTo("188****0000");
     assertThat(response.user().role()).isEqualTo("viewer");
-    assertThat(response.user().permissions()).containsExactly("tasks:read", "inspirations:read");
+    assertThat(response.user().permissions()).containsExactly(
+        "billing:read", "inspirations:read", "pricing:read", "tasks:read", "users:read");
+  }
+
+  private static AdminPermissionDefinitionRecord permission(String code) {
+    String[] parts = code.split(":", 2);
+    return new AdminPermissionDefinitionRecord(code, code, parts[0], parts[1], null, "LOW",
+        "ACTIVE", null, null);
   }
 }

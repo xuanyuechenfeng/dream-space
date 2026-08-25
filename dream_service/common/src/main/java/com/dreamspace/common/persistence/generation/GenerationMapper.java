@@ -39,6 +39,8 @@ public interface GenerationMapper {
       @Param("resolution") String resolution, @Param("width") Integer width, @Param("height") Integer height,
       @Param("imageIds") String imageIds, @Param("unitCost") int unitCost,
       @Param("totalCost") int totalCost, @Param("idempotencyKey") String idempotencyKey);
+  @Update("UPDATE \"GenerationTask\" SET \"pricingRuleId\"=#{ruleId},\"pricingRuleVersion\"=#{version},\"updatedAt\"=CURRENT_TIMESTAMP WHERE \"id\"=#{taskId}")
+  int updatePricingSnapshot(@Param("taskId") String taskId, @Param("ruleId") String ruleId, @Param("version") int version);
   @Update("UPDATE \"GenerationTask\" SET \"ratio\"=#{ratio}::\"GenerationRatio\",\"width\"=#{width},\"height\"=#{height},\"updatedAt\"=CURRENT_TIMESTAMP WHERE \"id\"=#{taskId} AND \"status\"='GENERATING' AND \"ratio\"='smart' AND \"width\" IS NULL AND \"height\" IS NULL")
   int updateResolvedDimensions(@Param("taskId") String taskId, @Param("ratio") String ratio,
       @Param("width") Integer width, @Param("height") Integer height);

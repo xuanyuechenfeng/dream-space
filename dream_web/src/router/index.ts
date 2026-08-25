@@ -3,6 +3,7 @@ import InspirationGalleryView from "@/features/inspiration/InspirationGalleryVie
 import InspirationDetailView from "@/features/inspiration/InspirationDetailView.vue";
 import LoginView from "@/features/auth/LoginView.vue";
 import GenerationWorkspaceView from "@/features/generation/GenerationWorkspaceView.vue";
+import AccountView from "@/views/AccountView.vue";
 import { useAuthStore } from "@/stores/auth";
 
 const router = createRouter({
@@ -14,6 +15,7 @@ const router = createRouter({
     { path: "/login", component: LoginView },
     { path: "/generate", component: GenerationWorkspaceView, props: true, meta: { requiresAuth: true } },
     { path: "/generate/:sessionId", component: GenerationWorkspaceView, props: true, meta: { requiresAuth: true } },
+    { path: "/account", component: AccountView, meta: { requiresAuth: true } },
   ],
 });
 

@@ -64,9 +64,23 @@ export const api = {
     cases: () => request<ModerationCase[]>("/dream_web/moderation/cases"),
     appeal: (caseId: string, reason: string) => request<ModerationCase>(`/dream_web/moderation/cases/${encodeURIComponent(caseId)}/appeals`, { method: "POST", body: JSON.stringify({ reason }) }),
   },
+  account: {
+    account: () => request<{ account: BillingAccount }>("/dream_web/account"),
+    ledger: (params = "") => request<{ items: BillingLedgerItem[]; total: number }>(`/dream_web/account/ledger${params ? `?${params}` : ""}`),
+    products: () => request<BillingProduct[]>("/dream_web/account/products"),
+    createOrder: (payload: BillingOrderRequest) => request<BillingOrder>("/dream_web/account/orders", { method: "POST", body: JSON.stringify(payload) }),
+    order: (orderNo: string) => request<BillingOrder>(`/dream_web/account/orders/${encodeURIComponent(orderNo)}`),
+    orders: (params = "") => request<{ items: BillingOrder[]; total: number }>(`/dream_web/account/orders${params ? `?${params}` : ""}`),
+    cancelOrder: (orderNo: string) => request<BillingOrder>(`/dream_web/account/orders/${encodeURIComponent(orderNo)}/cancel`, { method: "POST" }),
+  },
 };
 
 export interface AuthUser { id: string; phoneMasked: string; createdAt: string }
+export interface BillingAccount { userId: string; phoneMasked: string; status: string; displayName?: string; total: number; available: number; reserved: number; used: number; createdAt: string; lastLoginAt?: string | null }
+export interface BillingLedgerItem { id: string; type: string; amount: number; balanceAfter: number; sourceType?: string | null; sourceId?: string | null; taskId?: string | null; ruleId?: string | null; ruleVersion?: number | null; reasonCode?: string | null; createdAt: string }
+export interface BillingProduct { id: string; code: string; name: string; creditAmount: number; amountMinor: number; currency: string; validityDays?: number | null; status: string; sortOrder: number; createdAt: string; updatedAt: string }
+export interface BillingOrderRequest { productId: string; quantity: number; provider?: string; idempotencyKey: string }
+export interface BillingOrder { orderNo: string; productCode: string; productName: string; quantity: number; creditAmount: number; amountMinor: number; currency: string; status: string; provider: string; expiresAt: string; paidAt?: string | null; createdAt: string }
 export interface AuthSession { authenticated: boolean; user?: AuthUser }
 export interface CodeResponse { challengeId: string; expiresAt: string; retryAfterSeconds: number }
 export interface LoginPayload { phone: string; challengeId: string; code: string; version: string; termsAccepted: boolean; privacyAccepted: boolean; aiTermsAccepted: boolean }

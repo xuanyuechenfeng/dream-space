@@ -15,6 +15,8 @@ import com.dreamspace.common.persistence.quota.QuotaAccountRecord;
 import com.dreamspace.common.persistence.quota.QuotaTransactionService;
 import com.dreamspace.common.persistence.storage.ObjectStorage;
 import com.dreamspace.common.persistence.storage.ObjectStorageFactory;
+import com.dreamspace.api.persistence.admin.BillingMapper;
+import com.dreamspace.api.persistence.admin.PricingRuleRecord;
 import com.dreamspace.api.persistence.upload.ReferenceUploadMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -48,6 +50,7 @@ public class GenerationService {
   private final DreamSpaceProperties properties;
   private final ObjectMapper objectMapper;
   private final ReferenceUploadMapper uploads;
+  private final BillingMapper billing;
   private final TransactionTemplate transactions;
   private final ExecutorService sseExecutor = Executors.newCachedThreadPool(r -> {
     Thread thread = new Thread(r, "dream-space-generation-sse");
@@ -58,6 +61,12 @@ public class GenerationService {
   public GenerationService(GenerationMapper mapper, QuotaTransactionService quota, GenerationQueuePublisher queuePublisher,
       ObjectStorageFactory storage, DreamSpaceProperties properties, ObjectMapper objectMapper,
       PlatformTransactionManager transactionManager, ReferenceUploadMapper uploads) {
+    this(mapper, quota, queuePublisher, storage, properties, objectMapper, transactionManager, uploads, null);
+  }
+  @org.springframework.beans.factory.annotation.Autowired
+  public GenerationService(GenerationMapper mapper, QuotaTransactionService quota, GenerationQueuePublisher queuePublisher,
+      ObjectStorageFactory storage, DreamSpaceProperties properties, ObjectMapper objectMapper,
+      PlatformTransactionManager transactionManager, ReferenceUploadMapper uploads, BillingMapper billing) {
     this.mapper = mapper;
     this.quota = quota;
     this.queuePublisher = queuePublisher;
@@ -65,6 +74,7 @@ public class GenerationService {
     this.properties = properties;
     this.objectMapper = objectMapper;
     this.uploads = uploads;
+    this.billing = billing;
     this.transactions = new TransactionTemplate(transactionManager);
   }
 
@@ -263,7 +273,11 @@ public class GenerationService {
     if (mapper.insertTask(taskId, sessionId, userId, input.prompt(), MODELS.getFirst(), input.ratio(), input.resolution(),
         input.width(), input.height(), json(input.imageIds()), input.unitCost(), input.totalCost(), input.idempotencyKey()) != 1)
       throw new IllegalStateException("generation task was not inserted");
-    if (!quota.reserve(userId, taskId, input.totalCost(), taskId + ":reserve", properties.quota().initialTotal()))
+    if (input.ruleId() != null) mapper.updatePricingSnapshot(taskId, input.ruleId(), input.ruleVersion());
+    boolean reserved = input.ruleId() == null
+        ? quota.reserve(userId, taskId, input.totalCost(), taskId + ":reserve", properties.quota().initialTotal())
+        : quota.reserve(userId, taskId, input.totalCost(), taskId + ":reserve", properties.quota().initialTotal(), input.ruleId(), input.ruleVersion());
+    if (!reserved)
       throw bad("QUOTA_INSUFFICIENT", "额度不足");
     insertEvent(taskId, "task.queued", GenerationTaskStatus.QUEUED, null);
     // A submitted prompt and its references belong to the task history, not
@@ -293,10 +307,12 @@ public class GenerationService {
     GenerationInputMode mode = requireAutoMode(request.mode());
     List<String> imageIds = normalizeImageIds(userId, request.imageIds());
     OutputParameters output = validateOutput(request.ratio(), request.resolution(), request.width(), request.height());
-    int cost = "4K".equals(output.resolution()) ? 2 : 1;
+    PricingRuleRecord rule = billing == null ? null : billing.findActivePricingRule("IMAGE_GENERATION", output.resolution());
+    if (billing != null && rule == null) throw bad("PRICING_RULE_NOT_FOUND", "当前生成参数没有可用计费规则");
+    int cost = rule == null ? ("4K".equals(output.resolution()) ? 2 : 1) : rule.unitCreditCost();
     Draft draft = new Draft(mode.name(), prompt, imageIds, output.ratio(), output.resolution(), output.width(), output.height());
     return new Validated(key, request.sessionId(), mode, prompt, imageIds, output.ratio(), output.resolution(),
-        output.width(), output.height(), cost, cost, draft);
+        output.width(), output.height(), cost, cost, draft, rule == null ? null : rule.id(), rule == null ? null : rule.version());
   }
 
   private Draft normalizeDraft(Draft draft) {
@@ -480,6 +496,6 @@ public class GenerationService {
   private record OutputParameters(String ratio, String resolution, Integer width, Integer height) {}
   private record Validated(String idempotencyKey, String sessionId, GenerationInputMode mode, String prompt,
       List<String> imageIds, String ratio, String resolution, Integer width, Integer height,
-      int unitCost, int totalCost, Draft draft) {}
+      int unitCost, int totalCost, Draft draft, String ruleId, Integer ruleVersion) {}
   private record CreatedTask(GenerationTaskRecord task) {}
 }

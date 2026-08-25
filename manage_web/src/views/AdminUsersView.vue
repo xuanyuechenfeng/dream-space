@@ -1,0 +1,8 @@
+<script setup lang="ts">
+import { onMounted, ref } from "vue";
+import { adminApi, type Page, type UserItem } from "@/api/admin";
+const page = ref<Page<UserItem>>({ items: [], total: 0, page: 1, pageSize: 20, pageCount: 0 }); const query = ref(""); const loading = ref(false); const error = ref("");
+async function load() { loading.value = true; error.value = ""; try { page.value = await adminApi.users({ query: query.value, page: page.value.page, pageSize: page.value.pageSize }); } catch (e) { error.value = e instanceof Error ? e.message : "加载失败"; } finally { loading.value = false; } }
+onMounted(load);
+</script>
+<template><section class="admin-page"><header class="admin-page-header"><div><p class="admin-page-kicker">运营管理</p><h1>用户管理</h1><p>查看账号状态、额度和最近登录信息。</p></div><button class="admin-icon-button bordered" type="button" @click="load">刷新</button></header><form class="admin-filter-bar" @submit.prevent="page.page = 1; load()"><input v-model="query" placeholder="手机号或显示名" /><button class="admin-action-button" type="submit">搜索</button></form><p v-if="error" class="admin-error">{{ error }}</p><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>用户</th><th>状态</th><th>注册时间</th><th>最近登录</th><th>操作</th></tr></thead><tbody><tr v-for="user in page.items" :key="user.id"><td><strong>{{ user.displayName || '未命名用户' }}</strong><small>{{ user.phoneMasked }}</small></td><td>{{ user.status }}</td><td>{{ new Date(user.createdAt).toLocaleDateString() }}</td><td>{{ user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : '-' }}</td><td><RouterLink :to="`/users/${user.id}`">查看</RouterLink></td></tr><tr v-if="!loading && !page.items.length"><td colspan="5">暂无用户</td></tr></tbody></table></div></section></template>

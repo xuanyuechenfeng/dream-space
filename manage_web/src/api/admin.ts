@@ -1,5 +1,5 @@
 export type AdminRole = "viewer" | "operator" | "admin";
-export type AdminPermission = "tasks:read" | "inspirations:read" | "inspirations:write";
+export type AdminPermission = "tasks:read" | "tasks:write" | "inspirations:read" | "inspirations:write" | "users:read" | "users:write" | "billing:read" | "billing:write" | "pricing:read" | "pricing:write" | "audit:read";
 
 export interface AdminUser {
   id: string;
@@ -8,6 +8,11 @@ export interface AdminUser {
   role: AdminRole;
   permissions: AdminPermission[];
 }
+export interface UserItem { id: string; phoneMasked: string; status: string; displayName: string | null; createdAt: string; lastLoginAt: string | null; disabledAt: string | null; disabledReason: string | null }
+export interface BillingOrder { orderNo: string; userId: string; phoneMasked: string; productCode: string; productName: string; quantity: number; creditAmount: number; amountMinor: number; currency: string; status: string; provider: string; expiresAt: string; paidAt: string | null; createdAt: string }
+export interface BillingProduct { id: string; code: string; name: string; creditAmount: number; amountMinor: number; currency: string; validityDays: number | null; status: string; sortOrder: number; createdAt: string; updatedAt: string }
+export interface PricingRule { id: string; code: string; version: number; operation: string; resolution: string; unitCreditCost: number; formula: string; effectiveFrom: string; effectiveTo: string | null; status: string; createdBy: string; createdAt: string; updatedAt: string }
+export interface AuditEvent { id: string; actorId: string; actorType: string; action: string; subjectType: string; subjectId: string; before: unknown; after: unknown; reason: string | null; createdAt: string }
 
 export type AdminSession =
   | { authenticated: false; user: null }
@@ -173,6 +178,17 @@ export const adminApi = {
     detail: (id: string) => request<ModerationDetail>(`/manage_web/moderation/cases/${encodeURIComponent(id)}`),
     resolve: (id: string, outcome: "APPROVED" | "REJECTED", note: string) => request<ModerationDetail>(`/manage_web/moderation/cases/${encodeURIComponent(id)}/resolve`, { method: "POST", body: JSON.stringify({ outcome, note }) }),
   },
+  users: (filters: Record<string, string | number | undefined>) => request<Page<UserItem>>(`/manage_web/users?${query(filters)}`),
+  user: (id: string) => request<unknown>(`/manage_web/users/${encodeURIComponent(id)}`),
+  userLedger: (id: string, filters: Record<string, string | number | undefined>) => request<Page<unknown>>(`/manage_web/users/${encodeURIComponent(id)}/ledger?${query(filters)}`),
+  orders: (filters: Record<string, string | number | undefined>) => request<Page<BillingOrder>>(`/manage_web/billing/orders?${query(filters)}`),
+  order: (orderNo: string) => request<BillingOrder>(`/manage_web/billing/orders/${encodeURIComponent(orderNo)}`),
+  refund: (orderNo: string, reason: string, idempotencyKey: string) => request<unknown>(`/manage_web/billing/orders/${encodeURIComponent(orderNo)}/refund`, { method: "POST", body: JSON.stringify({ reason, idempotencyKey }) }),
+  products: () => request<BillingProduct[]>("/manage_web/billing/products"),
+  createProduct: (input: Omit<BillingProduct, "id" | "status" | "createdAt" | "updatedAt">) => request<BillingProduct>("/manage_web/billing/products", { method: "POST", body: JSON.stringify(input) }),
+  setProductStatus: (id: string, status: "ACTIVE" | "INACTIVE") => request<BillingProduct>(`/manage_web/billing/products/${encodeURIComponent(id)}/${status === "ACTIVE" ? "activate" : "inactivate"}`, { method: "POST" }),
+  pricingRules: () => request<PricingRule[]>("/manage_web/billing/rules"),
+  auditEvents: (filters: Record<string, string | number | undefined>) => request<Page<AuditEvent>>(`/manage_web/audit-events?${query(filters)}`),
 };
 
 export function resolveAssetUrl(value: string) {

@@ -58,6 +58,9 @@ public class AuthService {
     captcha.verifyAndConsume(input.captchaId(), input.captchaCode());
 
     UserRecord user = mapper.findUserByPhone(phone);
+    if (user != null && "DISABLED".equals(mapper.findUserStatusById(user.id()))) {
+      throw new ApiException(HttpStatus.FORBIDDEN, "ACCOUNT_DISABLED", "账号当前不可用");
+    }
     boolean passwordMatches = PasswordHashing.matches(input.password(), user == null ? null : user.passwordHash());
     if (user == null || user.passwordHash() == null || user.passwordHash().isBlank() || !passwordMatches) {
       throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_LOGIN_INVALID", "账号或密码错误");
@@ -78,14 +81,16 @@ public class AuthService {
     if (!constantEquals(challenge.codeHash(), hash(challenge.id() + ":" + input.code()))) { mapper.incrementAttempts(challenge.id()); throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_CODE_INVALID", "验证码错误或已过期"); }
     if (mapper.consumeCode(challenge.id()) != 1) throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_CODE_INVALID", "验证码错误或已过期");
     String userId = mapper.findUserIdByPhone(phone); if (userId == null) userId = UUID.randomUUID().toString(); mapper.upsertUser(userId, phone); userId = mapper.findUserIdByPhone(phone);
+    if ("DISABLED".equals(mapper.findUserStatusById(userId))) throw new ApiException(HttpStatus.FORBIDDEN, "ACCOUNT_DISABLED", "账号当前不可用");
     mapper.upsertAgreement(UUID.randomUUID().toString(), userId, AGREEMENT_VERSION, true, true, true);
     UserRecord user = mapper.findUserById(userId);
     return createSession(user);
   }
-  public SessionResponse session(String token) { if (token == null || token.isBlank()) return SessionResponse.no(); UserSessionRecord s = mapper.findActiveSession(hash(token)); if (s == null) return SessionResponse.no(); mapper.touchSession(s.tokenHash()); UserRecord u = mapper.findUserById(s.userId()); return u == null ? SessionResponse.no() : new SessionResponse(true, view(u)); }
+  public SessionResponse session(String token) { if (token == null || token.isBlank()) return SessionResponse.no(); UserSessionRecord s = mapper.findActiveSession(hash(token)); if (s == null) return SessionResponse.no(); mapper.touchSession(s.tokenHash()); UserRecord u = mapper.findUserById(s.userId()); return u == null || "DISABLED".equals(mapper.findUserStatusById(s.userId())) ? SessionResponse.no() : new SessionResponse(true, view(u)); }
   public void logout(String token) { if (token != null && !token.isBlank()) mapper.deleteSession(hash(token)); }
   public record SessionResult(SessionResponse response, String token, Instant expiresAt) {}
   private SessionResult createSession(UserRecord user) {
+    mapper.touchLogin(user.id());
     String token = randomToken();
     Instant expires = Instant.now().plus(Duration.ofDays(properties.auth().sessionDays()));
     mapper.insertSession(UUID.randomUUID().toString(), hash(token), user.id(), expires);
