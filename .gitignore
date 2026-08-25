@@ -27,3 +27,5 @@ Thumbs.db
 .trellis/*
 !.trellis/tasks/
 !.trellis/tasks/**
+!.trellis/workspace/
+!.trellis/workspace/**
