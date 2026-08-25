@@ -10,8 +10,8 @@ import java.util.List;
 
 @Mapper
 public interface AdminMapper {
-  @Select("SELECT * FROM \"AdminUser\" WHERE \"phone\" = #{phone} AND \"active\" = TRUE LIMIT 1") AdminUserRecord findActiveByPhone(String phone);
-  @Select("SELECT * FROM \"AdminUser\" WHERE \"id\" = #{id} AND \"active\" = TRUE LIMIT 1") AdminUserRecord findActiveById(String id);
+  @Select("SELECT \"id\",\"phone\",\"displayName\",\"role\",\"active\",\"createdAt\",\"updatedAt\",\"permissionRevision\",\"status\",\"version\",\"lastLoginAt\",\"createdBy\",\"disabledAt\",\"disabledBy\",\"disabledReason\" FROM \"AdminUser\" WHERE \"phone\" = #{phone} AND \"active\" = TRUE AND \"status\" = 'ACTIVE' LIMIT 1") AdminUserRecord findActiveByPhone(String phone);
+  @Select("SELECT \"id\",\"phone\",\"displayName\",\"role\",\"active\",\"createdAt\",\"updatedAt\",\"permissionRevision\",\"status\",\"version\",\"lastLoginAt\",\"createdBy\",\"disabledAt\",\"disabledBy\",\"disabledReason\" FROM \"AdminUser\" WHERE \"id\" = #{id} AND \"active\" = TRUE AND \"status\" = 'ACTIVE' LIMIT 1") AdminUserRecord findActiveById(String id);
   @Select("SELECT * FROM \"AdminSession\" WHERE \"tokenHash\" = #{tokenHash} AND \"expiresAt\" > CURRENT_TIMESTAMP LIMIT 1") AdminSessionRecord findActiveSession(String tokenHash);
   @Select("SELECT \"code\" FROM \"AdminPermissionDefinition\" ORDER BY \"code\"") List<String> listPermissionCodes();
   @Select("""
@@ -42,4 +42,5 @@ public interface AdminMapper {
   @Insert("INSERT INTO \"AdminSession\" (\"id\",\"tokenHash\",\"adminUserId\",\"expiresAt\",\"createdAt\",\"lastSeenAt\") VALUES (#{id},#{tokenHash},#{adminUserId},#{expiresAt},CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)") int insertSession(@Param("id") String id, @Param("tokenHash") String tokenHash, @Param("adminUserId") String adminUserId, @Param("expiresAt") Instant expiresAt);
   @Update("DELETE FROM \"AdminSession\" WHERE \"tokenHash\" = #{tokenHash}") int deleteSession(String tokenHash);
   @Update("DELETE FROM \"AdminSession\" WHERE \"adminUserId\" = #{adminUserId}") int deleteSessionsForAdmin(String adminUserId);
+  @Update("UPDATE \"AdminUser\" SET \"lastLoginAt\"=CURRENT_TIMESTAMP, \"updatedAt\"=CURRENT_TIMESTAMP WHERE \"id\"=#{id}") int markLogin(String id);
 }

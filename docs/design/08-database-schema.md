@@ -36,7 +36,12 @@
 | `VerificationCode` | `id varchar PK`、`phone varchar`、`codeHash varchar`、`expiresAt timestamptz`、`consumedAt timestamptz?`、`attempts int default 0`、`createdAt timestamptz` | `IDX(phone, createdAt)` |
 | `UserSession` | `id varchar PK`、`tokenHash varchar UQ`、`userId varchar FK`、`expiresAt timestamptz`、`createdAt timestamptz`、`lastSeenAt timestamptz` | `FK userId -> User.id ON DELETE CASCADE`、`IDX(userId, expiresAt)` |
 | `AgreementAcceptance` | `id varchar PK`、`userId varchar FK`、`version varchar`、`termsAccepted boolean default false`、`privacyAccepted boolean default false`、`aiTermsAccepted boolean default false`、`acceptedAt timestamptz` | `UQ(userId, version)`、级联删除 |
-| `AdminUser` | `id varchar PK`、`phone varchar UQ`、`displayName varchar`、`role AdminRole default VIEWER`、`active boolean default true`、`createdAt timestamptz`、`updatedAt timestamptz` | `IDX(active, role)` |
+| `AdminUser` | `id varchar PK`、`phone varchar UQ`、`displayName varchar`、`role AdminRole default VIEWER`、`active boolean`、`status INVITED/ACTIVE/DISABLED`、`version`、`lastLoginAt`、`createdBy`、`disabledAt/disabledBy/disabledReason`、`permissionRevision`、`createdAt`、`updatedAt` | `IDX(active, role)`、状态/角色/时间索引；`status` 与 `active` 一致性约束 |
+| `AdminRoleDefinition` | `id`、`code`、`name`、`description`、`system`、`status`、`version` | `code` 唯一；系统角色保护 |
+| `AdminPermissionDefinition` | `id`、`code`、`resource`、`action`、`description`、`riskLevel`、`status` | `code` 唯一；权限码格式和风险等级约束 |
+| `AdminUserRole` | `adminUserId`、`roleId`、`assignedBy`、`assignedAt` | 组合主键；管理员/角色外键级联 |
+| `AdminRolePermission` | `roleId`、`permissionId`、`grantedBy`、`grantedAt` | 组合主键；角色/权限外键级联 |
+| `AdminOperationIdempotency` | `scope`、`idempotencyKey`、`subjectId`、`createdAt` | 组合主键；创建时间索引 |
 | `AdminVerificationCode` | `id varchar PK`、`phone varchar`、`codeHash varchar`、`expiresAt timestamptz`、`consumedAt timestamptz?`、`attempts int default 0`、`createdAt timestamptz` | `IDX(phone, createdAt)` |
 | `AdminSession` | `id varchar PK`、`tokenHash varchar UQ`、`adminUserId varchar FK`、`expiresAt timestamptz`、`createdAt timestamptz`、`lastSeenAt timestamptz` | `FK adminUserId -> AdminUser.id ON DELETE CASCADE`、`IDX(adminUserId, expiresAt)` |
 

@@ -6,7 +6,6 @@ import java.util.Arrays;
 import javax.sql.DataSource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
-import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -27,7 +26,11 @@ public class DatabaseMigrationService {
           String version = resource.getFilename();
           if (!applied(connection, version)) {
             try {
-              ScriptUtils.executeSqlScript(connection, resource);
+              // PostgreSQL must parse the complete script so PL/pgSQL dollar-quoted
+              // function bodies are not split at their internal semicolons.
+              try (var scriptStatement = connection.createStatement()) {
+                scriptStatement.execute(resource.getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+              }
               try (var statement = connection.prepareStatement("INSERT INTO schema_migrations(version) VALUES (?)")) {
                 statement.setString(1, version); statement.executeUpdate();
               }

@@ -12,9 +12,9 @@ class MigrationResourceTest {
   @Test void includesTheCompletePrismaMigrationSequence() throws IOException {
     try (Stream<Path> files = Files.list(Path.of("src/main/resources/db/migration"))) {
       var names = files.map(path -> path.getFileName().toString()).sorted().toList();
-      assertThat(names).hasSize(21).allMatch(name -> name.endsWith(".sql"));
+      assertThat(names).hasSize(23).allMatch(name -> name.endsWith(".sql"));
       assertThat(names.get(0)).startsWith("20260803030753_");
-      assertThat(names.get(names.size() - 1)).startsWith("20260825090000_");
+      assertThat(names.get(names.size() - 1)).startsWith("20260825113000_");
       Path seed = Path.of("src/main/resources/db/migration/20260818100000_seed_inspirations.sql");
       try (Stream<String> lines = Files.lines(seed)) {
         assertThat(lines.filter(line -> line.startsWith("  (")).count()).isEqualTo(52);

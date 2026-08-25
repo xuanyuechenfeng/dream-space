@@ -9,6 +9,8 @@ import AdminBillingOrdersView from "@/views/AdminBillingOrdersView.vue";
 import AdminProductsView from "@/views/AdminProductsView.vue";
 import AdminPricingRulesView from "@/views/AdminPricingRulesView.vue";
 import AdminAuditEventsView from "@/views/AdminAuditEventsView.vue";
+import AdminAdminsView from "@/views/AdminAdminsView.vue";
+import AdminRolesView from "@/views/AdminRolesView.vue";
 import { useAdminAuthStore } from "@/stores/adminAuth";
 
 const router = createRouter({
@@ -28,6 +30,8 @@ const router = createRouter({
         { path: "billing/products", component: AdminProductsView },
         { path: "billing/rules", component: AdminPricingRulesView },
         { path: "audit-events", component: AdminAuditEventsView },
+        { path: "admins", component: AdminAdminsView },
+        { path: "roles", component: AdminRolesView },
       ],
     },
   ],

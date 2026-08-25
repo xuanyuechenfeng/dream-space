@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.dreamspace.common.persistence.database.DatabaseMigrationService;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -25,8 +24,10 @@ class PostgresMigrationIntegrationTest {
               ('legacy-operator', '18812340000', 'Legacy Operator', 'OPERATOR', true, CURRENT_TIMESTAMP),
               ('legacy-viewer', '18812340001', 'Legacy Viewer', 'VIEWER', true, CURRENT_TIMESTAMP)
             """);
-        ScriptUtils.executeSqlScript(connection,
-            new ClassPathResource("db/migration/20260825090000_add_admin_rbac.sql"));
+        try (var statement = connection.createStatement()) {
+          statement.execute(new ClassPathResource("db/migration/20260825090000_add_admin_rbac.sql")
+              .getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+        }
         connection.createStatement().executeUpdate("""
             INSERT INTO "AdminSession" ("id", "tokenHash", "adminUserId", "expiresAt", "createdAt", "lastSeenAt")
             VALUES
@@ -84,8 +85,8 @@ class PostgresMigrationIntegrationTest {
                   + "WHERE role_permission.\"roleId\" = 'admin-role-admin')");
           var result = statement.executeQuery()) {
         assertThat(result.next()).isTrue();
-        assertThat(result.getInt(1)).isEqualTo(33);
-        assertThat(result.getInt(2)).isEqualTo(21);
+        assertThat(result.getInt(1)).isEqualTo(34);
+        assertThat(result.getInt(2)).isEqualTo(23);
         assertThat(result.getInt(3)).isEqualTo(1);
         assertThat(result.getInt(4)).isEqualTo(3);
         assertThat(result.getInt(5)).isEqualTo(11);

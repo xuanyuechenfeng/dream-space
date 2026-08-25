@@ -164,7 +164,7 @@ onUnmounted(() => {
         <div ref="timeline" class="timeline">
           <LoaderCircle v-if="generation.loading" class="spin" aria-label="Loading" />
           <section v-else-if="!hasDetail" class="empty-session"><h1>{{ text.emptyTitle }}</h1><p class="empty-session-copy">{{ text.emptyCopy }}</p><div class="starter-prompts"><button v-for="prompt in starterPrompts" :key="prompt" class="starter-prompt" type="button" @click="draft.prompt = prompt"><span>{{ prompt }}</span></button></div></section>
-          <template v-else><section class="conversation-history" :aria-label="text.history"><div class="conversation-history-heading"><span>{{ text.history }}</span><span>{{ sortedSessions.length }}</span></div><div class="conversation-history-list"><button v-for="item in sortedSessions" :key="item.id" class="conversation-history-item" :class="{ active: active?.id === item.id }" type="button" @click="openSession(item.id)"><span class="conversation-history-title">{{ item.title }}</span><time :datetime="item.createdAt">{{ new Date(item.createdAt).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US') }}</time></button></div></section><div v-if="sortedTasks.length === 0" class="generation-empty">{{ text.noTasks }}</div>
+          <template v-else><div v-if="sortedTasks.length === 0" class="generation-empty">{{ text.noTasks }}</div>
             <template v-else>
               <h1 class="date-heading">{{ active?.title }}</h1>
               <article v-for="task in sortedTasks" :key="task.id" class="task">

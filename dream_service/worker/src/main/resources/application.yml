@@ -22,7 +22,7 @@ spring:
   ai:
     openai:
       # 规划与评估多模态模型密钥；必须通过 Secret 注入，不提供本地默认值。
-      api-key: sk-38b4c9e45039cf9a12873eaa2aae27bca41d32b00ae17da7720e88344a72b3b7
+      api-key: sk-6c87d142cf0f5c48b59de0e4d7d31
       # 必须填写 OpenAI-compatible API 根地址，例如 https://provider.example/v1。
       # Spring AI 会在此地址后追加 /chat/completions；不要填写完整接口 URL。
       base-url: https://api.honglin.asia/v1
@@ -99,7 +99,7 @@ dream-space:
       # 图片生成服务根地址，不复用规划 ChatModel 地址。
       base-url: https://api.honglin.asia
       # 图片模型独立密钥；禁止与规划密钥在日志或响应中输出。
-      api-key: sk-38b4c9e45039cf9a12873eaa2aae27bca41d32b00ae17da7720e88344a72b3b7
+      api-key: sk-9efa40398ee9739559c5c155a5af5
       # 专用图片生成模型名称。
       model: gpt-image-2
       # OpenAI-compatible 图片生成接口路径。

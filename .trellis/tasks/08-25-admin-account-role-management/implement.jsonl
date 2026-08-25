@@ -1,1 +1,8 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend package checklist for API and migration work"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Existing migration, mapper, locking, and naming conventions"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Existing API error and fail-closed permission semantics"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend package conventions and quality checklist"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Management page and responsive component conventions"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Typed admin API and permission contracts"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Account and role data flow crosses migration, API, and SPA"}
+{"file": "docs/design/19-admin-operations-capabilities.md", "reason": "Approved account, role, permission, API, security, and acceptance design"}

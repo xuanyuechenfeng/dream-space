@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ClipboardList, Images, LogOut, PanelLeftClose, ShieldCheck, ShieldAlert, Users, CreditCard, SlidersHorizontal, ScrollText } from "lucide-vue-next";
+import { ClipboardList, Images, LogOut, PanelLeftClose, ShieldCheck, ShieldAlert, Users, CreditCard, SlidersHorizontal, ScrollText, UserCog, KeyRound } from "lucide-vue-next";
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAdminAuthStore } from "@/stores/adminAuth";
@@ -8,6 +8,7 @@ const auth = useAdminAuthStore();
 const route = useRoute();
 const router = useRouter();
 const collapsed = ref(false);
+const can = (permission: string) => auth.session?.authenticated && auth.session.user.permissions.includes(permission as never);
 
 async function logout() {
   await auth.logout();
@@ -34,6 +35,8 @@ async function logout() {
         <RouterLink to="/billing/products" :class="{ active: route.path.startsWith('/billing/products') }"><SlidersHorizontal aria-hidden="true" /><span>额度产品</span></RouterLink>
         <RouterLink to="/billing/rules" :class="{ active: route.path.startsWith('/billing/rules') }"><SlidersHorizontal aria-hidden="true" /><span>计费规则</span></RouterLink>
         <RouterLink to="/audit-events" :class="{ active: route.path.startsWith('/audit-events') }"><ScrollText aria-hidden="true" /><span>操作审计</span></RouterLink>
+        <RouterLink v-if="can('admins:read')" to="/admins" :class="{ active: route.path.startsWith('/admins') }"><UserCog aria-hidden="true" /><span>管理员账号</span></RouterLink>
+        <RouterLink v-if="can('roles:read')" to="/roles" :class="{ active: route.path.startsWith('/roles') }"><KeyRound aria-hidden="true" /><span>角色权限</span></RouterLink>
       </nav>
       <div v-if="auth.session?.authenticated" class="admin-sidebar-account">
         <span class="admin-avatar">{{ auth.session.user.displayName.slice(0, 1) }}</span>

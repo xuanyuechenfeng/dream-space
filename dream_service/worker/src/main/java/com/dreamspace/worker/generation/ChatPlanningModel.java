@@ -145,6 +145,14 @@ public final class ChatPlanningModel implements PlanningModel {
       log.atWarn().addKeyValue("taskId", task.id()).addKeyValue("stage", type.getSimpleName())
           .addKeyValue("errorCode", "PLANNING_TEMPORARILY_UNAVAILABLE").log("planning model is temporarily unavailable");
       throw new GenerationProviderException("PLANNING_TEMPORARILY_UNAVAILABLE", "planning model is temporarily unavailable", true, error);
+    } catch (IllegalArgumentException error) {
+      log.atWarn().addKeyValue("taskId", task.id()).addKeyValue("stage", type.getSimpleName())
+          .addKeyValue("errorCode", "PLANNING_OUTPUT_INVALID")
+          .addKeyValue("exceptionType", error.getClass().getSimpleName())
+          .addKeyValue("responseLength", responseLength).addKeyValue("responseShape", responseShape)
+          .addKeyValue("responsePreview", responsePreview)
+          .log("planning model output failed contract validation");
+      throw new GenerationProviderException("PLANNING_OUTPUT_INVALID", "planning model output is invalid", false, error);
     } catch (Exception error) {
       log.atError().addKeyValue("taskId", task.id()).addKeyValue("stage", type.getSimpleName())
           .addKeyValue("errorCode", "PLANNING_OUTPUT_INVALID").addKeyValue("responseLength", responseLength)

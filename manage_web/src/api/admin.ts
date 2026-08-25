@@ -1,5 +1,5 @@
 export type AdminRole = "viewer" | "operator" | "admin";
-export type AdminPermission = "tasks:read" | "tasks:write" | "inspirations:read" | "inspirations:write" | "users:read" | "users:write" | "billing:read" | "billing:write" | "pricing:read" | "pricing:write" | "audit:read";
+export type AdminPermission = "tasks:read" | "tasks:write" | "inspirations:read" | "inspirations:write" | "users:read" | "users:write" | "billing:read" | "billing:write" | "pricing:read" | "pricing:write" | "audit:read" | "admins:read" | "admins:write" | "roles:read" | "roles:write";
 
 export interface AdminUser {
   id: string;
@@ -9,6 +9,9 @@ export interface AdminUser {
   permissions: AdminPermission[];
 }
 export interface UserItem { id: string; phoneMasked: string; status: string; displayName: string | null; createdAt: string; lastLoginAt: string | null; disabledAt: string | null; disabledReason: string | null }
+export interface AdminAccount { id: string; phoneMasked: string; displayName: string; status: "ACTIVE" | "DISABLED"; role: string; roleIds: string[]; version: number; createdAt: string; updatedAt: string; lastLoginAt: string | null; disabledAt: string | null; disabledReason: string | null }
+export interface AdminRoleDefinition { id: string; code: string; name: string; description: string | null; system: boolean; status: string; version: number; accountCount: number; permissionCount: number; permissionIds: string[] }
+export interface AdminPermissionDefinition { id: string; code: string; resource: string; action: string; description: string | null; riskLevel: string }
 export interface BillingOrder { orderNo: string; userId: string; phoneMasked: string; productCode: string; productName: string; quantity: number; creditAmount: number; amountMinor: number; currency: string; status: string; provider: string; expiresAt: string; paidAt: string | null; createdAt: string }
 export interface BillingProduct { id: string; code: string; name: string; creditAmount: number; amountMinor: number; currency: string; validityDays: number | null; status: string; sortOrder: number; createdAt: string; updatedAt: string }
 export interface PricingRule { id: string; code: string; version: number; operation: string; resolution: string; unitCreditCost: number; formula: string; effectiveFrom: string; effectiveTo: string | null; status: string; createdBy: string; createdAt: string; updatedAt: string }
@@ -188,6 +191,14 @@ export const adminApi = {
   createProduct: (input: Omit<BillingProduct, "id" | "status" | "createdAt" | "updatedAt">) => request<BillingProduct>("/manage_web/billing/products", { method: "POST", body: JSON.stringify(input) }),
   setProductStatus: (id: string, status: "ACTIVE" | "INACTIVE") => request<BillingProduct>(`/manage_web/billing/products/${encodeURIComponent(id)}/${status === "ACTIVE" ? "activate" : "inactivate"}`, { method: "POST" }),
   pricingRules: () => request<PricingRule[]>("/manage_web/billing/rules"),
+  admins: (filters: Record<string, string | number | undefined>) => request<Page<AdminAccount>>(`/manage_web/admins?${query(filters)}`),
+  createAdmin: (input: { phone: string; displayName: string; roleId: string }, idempotencyKey: string) => request<AdminAccount>("/manage_web/admins", { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify(input) }),
+  updateAdmin: (id: string, input: { displayName: string; status: "ACTIVE" | "DISABLED"; reason: string; version: number }) => request<AdminAccount>(`/manage_web/admins/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
+  replaceAdminRoles: (id: string, ids: string[], reason: string, version: number) => request<AdminAccount>(`/manage_web/admins/${encodeURIComponent(id)}/roles`, { method: "PUT", body: JSON.stringify({ ids, reason, version }) }),
+  roles: () => request<AdminRoleDefinition[]>("/manage_web/roles"),
+  createRole: (input: { code: string; name: string; description?: string }) => request<AdminRoleDefinition>("/manage_web/roles", { method: "POST", body: JSON.stringify(input) }),
+  permissions: () => request<AdminPermissionDefinition[]>("/manage_web/permissions"),
+  replaceRolePermissions: (id: string, ids: string[], reason: string, version: number) => request<AdminRoleDefinition>(`/manage_web/roles/${encodeURIComponent(id)}/permissions`, { method: "PUT", body: JSON.stringify({ ids, reason, version }) }),
   auditEvents: (filters: Record<string, string | number | undefined>) => request<Page<AuditEvent>>(`/manage_web/audit-events?${query(filters)}`),
 };
 

@@ -1,1 +1,5 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Review backend tests, transaction boundaries, and forbidden patterns"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Review migration idempotency, indexes, locks, and mapper SQL"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Review responsive states, accessibility, and frontend verification"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Review API response and permission type contracts"}
+{"file": "docs/design/19-admin-operations-capabilities.md", "reason": "Check implementation against account and role management acceptance criteria"}
