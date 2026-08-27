@@ -41,6 +41,8 @@ export const api = {
   login: (payload: LoginPayload) => request<AuthSession>("/dream_web/auth/login", { method: "POST", body: JSON.stringify(payload) }),
   captcha: () => request<CaptchaResponse>("/dream_web/auth/captcha"),
   passwordLogin: (payload: PasswordLoginPayload) => request<AuthSession>("/dream_web/auth/password-login", { method: "POST", body: JSON.stringify(payload) }),
+  registrationCode: (email: string) => request<CodeResponse>("/dream_web/auth/register/codes", { method: "POST", body: JSON.stringify({ email }) }),
+  register: (payload: RegisterPayload) => request<AuthSession>("/dream_web/auth/register", { method: "POST", body: JSON.stringify(payload) }),
   logout: () => request<void>("/dream_web/auth/logout", { method: "POST" }),
   inspirations: (params: URLSearchParams, signal?: AbortSignal) => request<InspirationPage>(`/dream_web/inspirations?${params}`, { signal }),
   inspiration: (slug: string) => request<Inspiration>(`/dream_web/inspirations/${encodeURIComponent(slug)}`),
@@ -75,7 +77,7 @@ export const api = {
   },
 };
 
-export interface AuthUser { id: string; phoneMasked: string; createdAt: string }
+export interface AuthUser { id: string; phoneMasked?: string | null; emailMasked?: string | null; createdAt: string }
 export interface BillingAccount { userId: string; phoneMasked: string; status: string; displayName?: string; total: number; available: number; reserved: number; used: number; createdAt: string; lastLoginAt?: string | null }
 export interface BillingLedgerItem { id: string; type: string; amount: number; balanceAfter: number; sourceType?: string | null; sourceId?: string | null; taskId?: string | null; ruleId?: string | null; ruleVersion?: number | null; reasonCode?: string | null; createdAt: string }
 export interface BillingProduct { id: string; code: string; name: string; creditAmount: number; amountMinor: number; currency: string; validityDays?: number | null; status: string; sortOrder: number; createdAt: string; updatedAt: string }
@@ -86,6 +88,7 @@ export interface CodeResponse { challengeId: string; expiresAt: string; retryAft
 export interface LoginPayload { phone: string; challengeId: string; code: string; version: string; termsAccepted: boolean; privacyAccepted: boolean; aiTermsAccepted: boolean }
 export interface CaptchaResponse { captchaId: string; imageData: string; expiresAt: string; retryAfterSeconds: number }
 export interface PasswordLoginPayload { phone: string; password: string; captchaId: string; captchaCode: string; version: string; termsAccepted: boolean; privacyAccepted: boolean; aiTermsAccepted: boolean }
+export interface RegisterPayload { email: string; challengeId: string; emailCode: string; password: string; version: string; termsAccepted: boolean; privacyAccepted: boolean; aiTermsAccepted: boolean }
 export interface Inspiration { id: string; slug: string; title: string; promptSummary?: string; prompt: string; category: string; imageUrl: string; thumbnailUrl: string; width: number; height: number; authorDisplayName: string; likeCount: number; modelName: string; ratio: string; resolutionLabel: string; isAiGenerated: boolean; sourceName?: string; sourceUrl?: string; publishedAt?: string }
 export interface InspirationPage { items: Inspiration[]; total: number; page?: number; pageSize?: number; pageCount?: number }
 export type GenerationMode = "AUTO";

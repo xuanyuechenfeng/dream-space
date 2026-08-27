@@ -72,9 +72,10 @@ public record DreamSpaceProperties(
   }
 
   public record Auth(long codeTtlSeconds, long sessionDays, long captchaTtlSeconds,
-      int captchaMaxAttempts, int captchaIssueLimitPerMinute) {
+      int captchaMaxAttempts, int captchaIssueLimitPerMinute, long emailCodeTtlSeconds,
+      int emailCodeMaxAttempts, int emailCodeIssueLimitPerMinute, String emailFrom) {
     public Auth(long codeTtlSeconds, long sessionDays) {
-      this(codeTtlSeconds, sessionDays, 300, 5, 10);
+      this(codeTtlSeconds, sessionDays, 300, 5, 10, 600, 5, 5, null);
     }
 
     public Auth {
@@ -83,6 +84,9 @@ public record DreamSpaceProperties(
       if (captchaTtlSeconds < 30) captchaTtlSeconds = 300;
       if (captchaMaxAttempts < 1) captchaMaxAttempts = 5;
       if (captchaIssueLimitPerMinute < 1) captchaIssueLimitPerMinute = 10;
+      if (emailCodeTtlSeconds < 60) emailCodeTtlSeconds = 600;
+      if (emailCodeMaxAttempts < 1) emailCodeMaxAttempts = 5;
+      if (emailCodeIssueLimitPerMinute < 1) emailCodeIssueLimitPerMinute = 5;
     }
   }
 

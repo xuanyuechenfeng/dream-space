@@ -66,6 +66,12 @@ dream-space:
     captcha-max-attempts: ${AUTH_CAPTCHA_MAX_ATTEMPTS:5}
     # 同一客户端每分钟最多申请的图形验证码数量。
     captcha-issue-limit-per-minute: ${AUTH_CAPTCHA_ISSUE_LIMIT_PER_MINUTE:10}
+    # 注册邮箱验证码有效期、错误上限和每分钟发放上限。
+    email-code-ttl-seconds: ${AUTH_EMAIL_CODE_TTL_SECONDS:600}
+    email-code-max-attempts: ${AUTH_EMAIL_CODE_MAX_ATTEMPTS:5}
+    email-code-issue-limit-per-minute: ${AUTH_EMAIL_CODE_ISSUE_LIMIT_PER_MINUTE:5}
+    # SMTP 发件地址；为空时注册验证码接口返回服务未配置。
+    email-from: ${AUTH_EMAIL_FROM:}
   quota:
     # 新用户首次创建额度账户时授予的初始点数。
     initial-total: ${QUOTA_INITIAL_TOTAL:100}

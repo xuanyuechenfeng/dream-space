@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Check migration and mapper compliance."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Check backend quality and tests."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Check Vue UI behavior and accessibility."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check frontend verification."}
+{"file":"docs/design/18-billing-user-management-and-payments.md","reason":"Check implementation against the approved design."}

@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Migration, quoted PostgreSQL identifiers, and MyBatis mapper conventions."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Backend quality and testing requirements."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Vue component and accessibility conventions."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Pinia and server-state conventions."}
+{"file":"docs/design/18-billing-user-management-and-payments.md","reason":"Approved domain, API, schema, and rollout design."}

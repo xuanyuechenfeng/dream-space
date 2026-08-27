@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { api, type GenerationDraft, type GenerationOptions, type GenerationQuota, type GenerationSession, type GenerationSessionSummary, type GenerationSubmitResponse } from "@/api/client";
 import { dimensionsForRatio, resolutionOption } from "@/features/generation/generationDimensions";
+import { createUuid } from "./uuid";
 
 const blankDraft = (): GenerationDraft => ({ mode: "AUTO", prompt: "", imageIds: [], ratio: "1:1", resolution: "2K", width: 2048, height: 2048 });
 function normalizeDraft(value?: Partial<GenerationDraft> | null): GenerationDraft {
@@ -99,7 +100,7 @@ export const useGenerationStore = defineStore("generation", () => {
       // keeps the first submit from creating an orphan session with no task.
       const sessionId = active.value?.id;
       fingerprint = submissionFingerprint(sessionId, snapshot);
-      const idempotencyKey = pendingSubmissionKeys.get(fingerprint) ?? `web-${crypto.randomUUID()}`;
+      const idempotencyKey = pendingSubmissionKeys.get(fingerprint) ?? `web-${createUuid()}`;
       pendingSubmissionKeys.set(fingerprint, idempotencyKey);
       const result = await api.generation.submit({ ...snapshot, mode: "AUTO", ...(sessionId ? { sessionId } : {}), idempotencyKey });
       if (!isSubmitResponse(result)) throw new Error("生成接口返回数据无效，请稍后重试");

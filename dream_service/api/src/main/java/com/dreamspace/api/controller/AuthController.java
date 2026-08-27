@@ -21,6 +21,17 @@ public class AuthController {
     this.secure = props.security().secureCookies();
   }
   @PostMapping("/codes") AuthService.CodeResponse codes(@RequestBody AuthService.CodeRequest body) { return service.sendCode(body); }
+  @PostMapping("/register/codes") AuthService.CodeResponse registrationCodes(@RequestBody AuthService.EmailCodeRequest body,
+      HttpServletRequest request) {
+    String userAgent = request.getHeader("User-Agent");
+    return service.sendRegistrationCode(body, request.getRemoteAddr() + "|" + (userAgent == null ? "" : userAgent));
+  }
+  @PostMapping("/register") AuthService.SessionResponse register(@RequestBody AuthService.RegisterRequest body,
+      HttpServletResponse response) {
+    var result = service.register(body);
+    CookieSupport.set(response, CookieSupport.USER, result.token(), java.time.Duration.between(java.time.Instant.now(), result.expiresAt()), secure);
+    return result.response();
+  }
   @PostMapping("/login") AuthService.SessionResponse login(@RequestBody AuthService.LoginRequest body, HttpServletResponse response) { var result = service.login(body); CookieSupport.set(response, CookieSupport.USER, result.token(), java.time.Duration.between(java.time.Instant.now(), result.expiresAt()), secure); return result.response(); }
   @GetMapping("/captcha") CaptchaService.CaptchaResponse captcha(HttpServletRequest request) {
     String userAgent = request.getHeader("User-Agent");
