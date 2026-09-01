@@ -79,8 +79,8 @@ public class BillingService {
     String normalized = optionalType(type);
     int p = range(page, 1, 1_000_000);
     int size = range(pageSize, 1, 100);
-    long total = mapper.countLedger(userId, normalized);
-    List<LedgerItem> items = mapper.listLedger(userId, normalized, size, (p - 1) * size).stream().map(this::ledger).toList();
+    long total = mapper.countAccountLedger(userId, normalized);
+    List<LedgerItem> items = mapper.listAccountLedger(userId, normalized, size, (p - 1) * size).stream().map(this::ledger).toList();
     return new Page<>(items, total, p, size, (int) Math.ceil(total / (double) size));
   }
 
@@ -100,7 +100,12 @@ public class BillingService {
 
   public Page<LedgerItem> userLedger(String id, String type, int page, int pageSize) {
     requiredUser(id);
-    return ledger(id, type, page, pageSize);
+    String normalized = optionalType(type);
+    int p = range(page, 1, 1_000_000);
+    int size = range(pageSize, 1, 100);
+    long total = mapper.countUserLedger(id, normalized);
+    List<LedgerItem> items = mapper.listUserLedger(id, normalized, size, (p - 1) * size).stream().map(this::ledger).toList();
+    return new Page<>(items, total, p, size, (int) Math.ceil(total / (double) size));
   }
 
   @Transactional

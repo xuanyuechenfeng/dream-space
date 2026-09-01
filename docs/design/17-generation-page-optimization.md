@@ -28,7 +28,7 @@
 2. `submit()` 在 `generation.submit()` 和路由更新完成后执行；
 3. 监听活动会话任务列表的长度、任务状态、结果数量和更新时间，SSE 刷新后执行。
 
-滚动采用 `element.scrollTo({ top: element.scrollHeight, behavior: "smooth" })`，在 `prefers-reduced-motion` 下改为 `behavior: "auto"`。使用 `requestAnimationFrame`/`nextTick` 等待图片和占位节点进入 DOM；滚动失败不影响生成流程。
+滚动采用 `element.scrollTo({ top: element.scrollHeight, behavior: "auto" })` 直接定位到底部，不在加载历史消息时播放滚动动画。使用 `requestAnimationFrame`/`nextTick` 等待图片和占位节点进入 DOM；滚动失败不影响生成流程。
 
 ### 3.3 输入宽度
 

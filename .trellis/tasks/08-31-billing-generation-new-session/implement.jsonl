@@ -1,0 +1,11 @@
+{"file":".trellis/spec/backend/index.md","reason":"后端模块入口与开发检查清单"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"MyBatis 查询、数据库枚举与迁移边界"}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"API 本地 mapper/service 的模块归属"}
+{"file":".trellis/spec/frontend/index.md","reason":"前端开发规范入口"}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Pinia 会话状态与 URL 状态边界"}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Vue 组件和响应式布局约束"}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"前端类型与 API 响应约束"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"账单 API 到页面及路由到 store 的跨层契约"}
+{"file":".trellis/tasks/08-31-billing-generation-new-session/research/billing-ledger.md","reason":"用户账单过滤边界、管理员兼容性与测试建议"}
+{"file":".trellis/tasks/08-31-billing-generation-new-session/research/generation-session-state.md","reason":"生成页路由、store、恢复意图与首次提交调研"}
+{"file":".trellis/tasks/08-31-billing-generation-new-session/research/visual-layout.md","reason":"参考截图几何关系、CSS 冲突和响应式验证矩阵"}

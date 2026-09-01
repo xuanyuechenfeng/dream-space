@@ -82,10 +82,12 @@ dream-space:
     captcha-max-attempts: ${AUTH_CAPTCHA_MAX_ATTEMPTS:5}
     # 共享认证配置中的验证码每分钟发放上限；Worker 当前不签发验证码。
     captcha-issue-limit-per-minute: ${AUTH_CAPTCHA_ISSUE_LIMIT_PER_MINUTE:10}
-    email-code-ttl-seconds: ${AUTH_EMAIL_CODE_TTL_SECONDS:600}
-    email-code-max-attempts: ${AUTH_EMAIL_CODE_MAX_ATTEMPTS:5}
-    email-code-issue-limit-per-minute: ${AUTH_EMAIL_CODE_ISSUE_LIMIT_PER_MINUTE:5}
-    email-from: ${AUTH_EMAIL_FROM:}
+  email:
+    # Worker 不发送邮件，但保留共享配置结构并与 API 使用相同的环境变量。
+    from: ${AUTH_EMAIL_FROM:}
+    code-ttl-seconds: ${AUTH_EMAIL_CODE_TTL_SECONDS:600}
+    code-max-attempts: ${AUTH_EMAIL_CODE_MAX_ATTEMPTS:5}
+    code-issue-limit-per-minute: ${AUTH_EMAIL_CODE_ISSUE_LIMIT_PER_MINUTE:5}
   quota:
     # 共享额度配置中的新用户初始点数；Worker 当前不创建额度账户，值应与 API 保持一致。
     initial-total: ${QUOTA_INITIAL_TOTAL:100}

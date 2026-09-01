@@ -60,14 +60,14 @@ public class AuthService {
     String clientHash = hash(clientKey == null ? "" : clientKey);
     Instant since = Instant.now().minusSeconds(60);
     if (mapper.countRecentRegistrationCodesByEmail(emailHash, since)
-        >= properties.auth().emailCodeIssueLimitPerMinute()
+        >= properties.email().codeIssueLimitPerMinute()
         || mapper.countRecentRegistrationCodesByClient(clientHash, since)
-        >= properties.auth().emailCodeIssueLimitPerMinute() * 2L) {
+        >= properties.email().codeIssueLimitPerMinute() * 2L) {
       throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "AUTH_EMAIL_RATE_LIMITED", "请求过于频繁，请稍后再试");
     }
     String id = UUID.randomUUID().toString();
     String code = String.format("%06d", RANDOM.nextInt(1_000_000));
-    Instant expiresAt = Instant.now().plusSeconds(properties.auth().emailCodeTtlSeconds());
+    Instant expiresAt = Instant.now().plusSeconds(properties.email().codeTtlSeconds());
     mapper.insertRegistrationEmailCode(id, emailHash, hash(id + ":" + code), clientHash, expiresAt);
     try {
       emailSender.sendRegistrationCode(email, code);
@@ -91,15 +91,15 @@ public class AuthService {
     }
     var challenge = mapper.findRegistrationEmailCode(input.challengeId());
     if (challenge == null || !hash(email).equals(challenge.emailHash()) || challenge.consumedAt() != null
-        || challenge.attempts() >= properties.auth().emailCodeMaxAttempts()
+        || challenge.attempts() >= properties.email().codeMaxAttempts()
         || challenge.expiresAt().isBefore(Instant.now())) {
       throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_EMAIL_CODE_INVALID", "邮箱验证码错误或已过期");
     }
     if (!constantEquals(challenge.codeHash(), hash(challenge.id() + ":" + input.emailCode()))) {
-      mapper.incrementRegistrationEmailCodeAttempts(challenge.id(), properties.auth().emailCodeMaxAttempts());
+      mapper.incrementRegistrationEmailCodeAttempts(challenge.id(), properties.email().codeMaxAttempts());
       throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_EMAIL_CODE_INVALID", "邮箱验证码错误或已过期");
     }
-    if (mapper.consumeRegistrationEmailCode(challenge.id(), properties.auth().emailCodeMaxAttempts()) != 1) {
+    if (mapper.consumeRegistrationEmailCode(challenge.id(), properties.email().codeMaxAttempts()) != 1) {
       throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_EMAIL_CODE_INVALID", "邮箱验证码错误或已过期");
     }
     if (mapper.findUserByEmail(email) != null) {

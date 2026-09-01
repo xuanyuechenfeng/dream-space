@@ -14,6 +14,7 @@ public interface BillingMapper {
   String LEDGER_SELECT = "SELECT \"id\",\"userId\",\"taskId\",\"type\",\"amount\",\"balanceAfter\",\"sourceType\",\"sourceId\",\"ruleId\",\"ruleVersion\",\"reasonCode\",\"createdAt\" FROM \"QuotaLedgerEntry\"";
   // PostgreSQL cannot infer the type of a nullable bind parameter used directly in IS NULL.
   String LEDGER_TYPE_FILTER = "(CAST(#{type} AS \"QuotaLedgerType\") IS NULL OR \"type\"=CAST(#{type} AS \"QuotaLedgerType\"))";
+  String ACCOUNT_LEDGER_VISIBILITY_FILTER = "\"type\" NOT IN ('RESERVE'::\"QuotaLedgerType\",'RELEASE'::\"QuotaLedgerType\")";
 
   @Select(USER_SELECT + " WHERE u.\"id\"=#{id} LIMIT 1") BillingUserRecord findUser(String id);
   @Select(USER_SELECT + " WHERE (#{query} IS NULL OR u.\"phone\" LIKE CONCAT('%',#{query},'%') OR LOWER(COALESCE(u.\"displayName\",'')) LIKE LOWER(CONCAT('%',#{query},'%'))) ORDER BY u.\"createdAt\" DESC LIMIT #{limit} OFFSET #{offset}")
@@ -26,9 +27,12 @@ public interface BillingMapper {
   @Update("UPDATE \"User\" SET \"status\"='ACTIVE',\"disabledAt\"=NULL,\"disabledBy\"=NULL,\"disabledReason\"=NULL,\"updatedAt\"=CURRENT_TIMESTAMP WHERE \"id\"=#{id} AND \"status\"='DISABLED'") int enableUser(String id);
   @Update("DELETE FROM \"UserSession\" WHERE \"userId\"=#{id}") int revokeSessions(String id);
   @Update("UPDATE \"User\" SET \"displayName\"=#{displayName},\"updatedAt\"=CURRENT_TIMESTAMP WHERE \"id\"=#{id}") int updateDisplayName(@Param("id") String id, @Param("displayName") String displayName);
+  @Select(LEDGER_SELECT + " WHERE \"userId\"=#{userId} AND " + LEDGER_TYPE_FILTER + " AND " + ACCOUNT_LEDGER_VISIBILITY_FILTER + " ORDER BY \"createdAt\" DESC LIMIT #{limit} OFFSET #{offset}")
+  List<BillingLedgerRecord> listAccountLedger(@Param("userId") String userId, @Param("type") String type, @Param("limit") int limit, @Param("offset") int offset);
+  @Select("SELECT COUNT(*) FROM \"QuotaLedgerEntry\" WHERE \"userId\"=#{userId} AND " + LEDGER_TYPE_FILTER + " AND " + ACCOUNT_LEDGER_VISIBILITY_FILTER)
+  long countAccountLedger(@Param("userId") String userId, @Param("type") String type);
   @Select(LEDGER_SELECT + " WHERE \"userId\"=#{userId} AND " + LEDGER_TYPE_FILTER + " ORDER BY \"createdAt\" DESC LIMIT #{limit} OFFSET #{offset}")
-  List<BillingLedgerRecord> listLedger(@Param("userId") String userId, @Param("type") String type, @Param("limit") int limit, @Param("offset") int offset);
-  @Select("SELECT COUNT(*) FROM \"QuotaLedgerEntry\" WHERE \"userId\"=#{userId} AND " + LEDGER_TYPE_FILTER) long countLedger(@Param("userId") String userId, @Param("type") String type);
+  List<BillingLedgerRecord> listUserLedger(@Param("userId") String userId, @Param("type") String type, @Param("limit") int limit, @Param("offset") int offset);
   @Select("SELECT COUNT(*) FROM \"QuotaLedgerEntry\" WHERE \"userId\"=#{userId} AND " + LEDGER_TYPE_FILTER) long countUserLedger(@Param("userId") String userId, @Param("type") String type);
   @Insert("INSERT INTO \"QuotaLedgerEntry\" (\"id\",\"userId\",\"type\",\"amount\",\"balanceAfter\",\"idempotencyKey\",\"sourceType\",\"sourceId\",\"reasonCode\",\"createdAt\") SELECT #{id},a.\"userId\",'GRANT'::\"QuotaLedgerType\",#{amount},a.\"available\"+#{amount},#{key},#{sourceType},#{sourceId},#{reason},CURRENT_TIMESTAMP FROM \"QuotaAccount\" a WHERE a.\"userId\"=#{userId} ON CONFLICT (\"idempotencyKey\") DO NOTHING")
   int insertGrant(@Param("id") String id, @Param("userId") String userId, @Param("amount") int amount, @Param("key") String key, @Param("sourceType") String sourceType, @Param("sourceId") String sourceId, @Param("reason") String reason);

@@ -15,7 +15,7 @@ public class SmtpEmailSender implements EmailSender {
   public SmtpEmailSender(org.springframework.beans.factory.ObjectProvider<JavaMailSender> provider,
       com.dreamspace.common.persistence.config.DreamSpaceProperties properties) {
     this.sender = provider::getIfAvailable;
-    this.from = properties.auth().emailFrom();
+    this.from = properties.email().from();
   }
 
   @Override

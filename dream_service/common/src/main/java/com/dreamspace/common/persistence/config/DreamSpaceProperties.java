@@ -11,18 +11,24 @@ public record DreamSpaceProperties(
     Storage storage,
     Queue queue,
     Auth auth,
+    Email email,
     Quota quota,
     Ai ai,
     Security security) {
 
   public DreamSpaceProperties(Redis redis, Storage storage, Queue queue,
       Auth auth, Quota quota) {
-    this(redis, storage, queue, auth, quota, null, null);
+    this(redis, storage, queue, auth, null, quota, null, null);
   }
 
   public DreamSpaceProperties(Redis redis, Storage storage, Queue queue,
       Auth auth, Quota quota, Ai ai) {
-    this(redis, storage, queue, auth, quota, ai, null);
+    this(redis, storage, queue, auth, null, quota, ai, null);
+  }
+
+  public DreamSpaceProperties(Redis redis, Storage storage, Queue queue,
+      Auth auth, Quota quota, Ai ai, Security security) {
+    this(redis, storage, queue, auth, null, quota, ai, security);
   }
 
   @ConstructorBinding
@@ -31,6 +37,7 @@ public record DreamSpaceProperties(
     storage = storage == null ? new Storage("local", null, null) : storage;
     queue = queue == null ? new Queue(3, Duration.ofMillis(500)) : queue;
     auth = auth == null ? new Auth(300, 30) : auth;
+    email = email == null ? new Email(null, 600, 5, 5) : email;
     quota = quota == null ? new Quota(100) : quota;
     ai = ai == null ? new Ai(new Planning(false, 2),
         new Image(false, null, null, null, null, "/v1/images/generations", Duration.ofSeconds(60), 3),
@@ -72,10 +79,9 @@ public record DreamSpaceProperties(
   }
 
   public record Auth(long codeTtlSeconds, long sessionDays, long captchaTtlSeconds,
-      int captchaMaxAttempts, int captchaIssueLimitPerMinute, long emailCodeTtlSeconds,
-      int emailCodeMaxAttempts, int emailCodeIssueLimitPerMinute, String emailFrom) {
+      int captchaMaxAttempts, int captchaIssueLimitPerMinute) {
     public Auth(long codeTtlSeconds, long sessionDays) {
-      this(codeTtlSeconds, sessionDays, 300, 5, 10, 600, 5, 5, null);
+      this(codeTtlSeconds, sessionDays, 300, 5, 10);
     }
 
     public Auth {
@@ -84,9 +90,15 @@ public record DreamSpaceProperties(
       if (captchaTtlSeconds < 30) captchaTtlSeconds = 300;
       if (captchaMaxAttempts < 1) captchaMaxAttempts = 5;
       if (captchaIssueLimitPerMinute < 1) captchaIssueLimitPerMinute = 10;
-      if (emailCodeTtlSeconds < 60) emailCodeTtlSeconds = 600;
-      if (emailCodeMaxAttempts < 1) emailCodeMaxAttempts = 5;
-      if (emailCodeIssueLimitPerMinute < 1) emailCodeIssueLimitPerMinute = 5;
+    }
+  }
+
+  public record Email(String from, long codeTtlSeconds, int codeMaxAttempts,
+      int codeIssueLimitPerMinute) {
+    public Email {
+      if (codeTtlSeconds < 60) codeTtlSeconds = 600;
+      if (codeMaxAttempts < 1) codeMaxAttempts = 5;
+      if (codeIssueLimitPerMinute < 1) codeIssueLimitPerMinute = 5;
     }
   }
 

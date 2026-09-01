@@ -48,7 +48,7 @@ register
 
 ## 5. 配置与安全
 
-新增 `dream-space.auth` 配置：`email-code-ttl-seconds`、`email-code-max-attempts`、`email-code-issue-limit-per-minute`、`email-from`。SMTP 使用标准 `spring.mail.*` 环境变量注入，禁止把密码写入仓库。密码继续 PBKDF2 哈希；邮箱日志只允许哈希或掩码。
+新增独立的 `dream-space.email` 配置：`code-ttl-seconds`、`code-max-attempts`、`code-issue-limit-per-minute`、`from`。SMTP 使用标准 `spring.mail.*` 环境变量注入，禁止把密码写入仓库。密码继续 PBKDF2 哈希；邮箱日志只允许哈希或掩码。
 
 ## 6. 前端设计
 

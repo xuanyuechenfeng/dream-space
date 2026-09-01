@@ -7,8 +7,10 @@ type ActivityTab = "ledger" | "orders";
 
 const account = ref<BillingAccount | null>(null);
 const items = ref<BillingLedgerItem[]>([]);
+const ledgerTotal = ref(0);
 const products = ref<BillingProduct[]>([]);
 const orders = ref<BillingOrder[]>([]);
+const orderTotal = ref(0);
 const activeTab = ref<ActivityTab>("ledger");
 const error = ref("");
 const loading = ref(true);
@@ -26,7 +28,7 @@ function isCredit(type: string) { return ["GRANT", "RELEASE", "REFUND"].includes
 function signedAmount(item: BillingLedgerItem) { return `${isCredit(item.type) ? "+" : "-"}${item.amount}`; }
 function statusLabel(status: string) { return ({ PAID: "已支付", PENDING: "待支付", CREATED: "待支付", CANCELLED: "已取消", EXPIRED: "已过期", REFUNDED: "已退款" } as Record<string, string>)[status] ?? status; }
 function statusTone(status: string) { if (["PAID", "ACTIVE"].includes(status)) return "success"; if (["PENDING", "CREATED"].includes(status)) return "pending"; if (["CANCELLED", "EXPIRED", "REFUNDED"].includes(status)) return "muted"; return "neutral"; }
-async function load() { const [a, l, p, o] = await Promise.all([api.account.account(), api.account.ledger(), api.account.products(), api.account.orders()]); account.value = a.account; items.value = l.items; products.value = p; orders.value = o.items; }
+async function load() { const [a, l, p, o] = await Promise.all([api.account.account(), api.account.ledger(), api.account.products(), api.account.orders()]); account.value = a.account; items.value = l.items; ledgerTotal.value = l.total; products.value = p; orders.value = o.items; orderTotal.value = o.total; }
 async function refresh() { refreshing.value = true; error.value = ""; try { await load(); } catch (e) { error.value = e instanceof Error ? e.message : "刷新失败，请稍后重试"; } finally { refreshing.value = false; } }
 async function buy(product: BillingProduct) { buying.value = product.id; error.value = ""; try { await api.account.createOrder({ productId: product.id, quantity: 1, provider: "mock", idempotencyKey: `web-${product.id}-${Date.now()}` }); await load(); activeTab.value = "orders"; } catch (e) { error.value = e instanceof Error ? e.message : "订单创建失败"; } finally { buying.value = ""; } }
 onMounted(async () => { try { await load(); } catch (e) { error.value = e instanceof Error ? e.message : "加载失败，请稍后重试"; } finally { loading.value = false; } });
@@ -72,7 +74,7 @@ onMounted(async () => { try { await load(); } catch (e) { error.value = e instan
         </section>
 
         <section class="activity-section" aria-labelledby="activity-title">
-          <div class="section-heading activity-heading"><div><p class="section-kicker">ACTIVITY</p><h2 id="activity-title">账单记录</h2></div><span class="section-note">共 {{ activeTab === "ledger" ? items.length : orders.length }} 条记录</span></div>
+          <div class="section-heading activity-heading"><div><p class="section-kicker">ACTIVITY</p><h2 id="activity-title">账单记录</h2></div><span class="section-note">共 {{ activeTab === "ledger" ? ledgerTotal : orderTotal }} 条记录</span></div>
           <div class="activity-tabs" role="tablist" aria-label="账单记录类型">
             <button class="activity-tab" :class="{ active: activeTab === 'ledger' }" type="button" role="tab" :aria-selected="activeTab === 'ledger'" @click="activeTab = 'ledger'"><Activity :size="16" aria-hidden="true" />额度流水</button>
             <button class="activity-tab" :class="{ active: activeTab === 'orders' }" type="button" role="tab" :aria-selected="activeTab === 'orders'" @click="activeTab = 'orders'"><CreditCard :size="16" aria-hidden="true" />支付订单</button>

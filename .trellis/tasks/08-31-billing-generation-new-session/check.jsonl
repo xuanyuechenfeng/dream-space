@@ -1,0 +1,9 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"后端测试与代码质量复核"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"核对 SQL 分页前过滤与管理员完整查询"}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"前端构建、测试与回归检查"}
+{"file":".trellis/spec/frontend/state-management.md","reason":"核对 URL、active session 和 draft 状态契约"}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"核对组件交互、可访问性和响应式布局"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"核对接口 total、分页和前端展示的一致性"}
+{"file":".trellis/tasks/08-31-billing-generation-new-session/research/billing-ledger.md","reason":"复核用户与管理员账单可见性边界"}
+{"file":".trellis/tasks/08-31-billing-generation-new-session/research/generation-session-state.md","reason":"复核新会话与首次提交回归点"}
+{"file":".trellis/tasks/08-31-billing-generation-new-session/research/visual-layout.md","reason":"复核居中布局、断点和视觉检查范围"}

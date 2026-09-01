@@ -35,15 +35,105 @@ test.describe("web regression matrix", () => {
     await expect(page).toHaveScreenshot(`${test.info().project.name}-login.png`);
   });
 
-  test("generation workspace renders an authenticated empty or populated state", async ({ page }) => {
+  test("generation workspace renders a centered new-session state", async ({ page }) => {
     await page.goto("/dream_web/generate");
     await expect(page.getByRole("main").first()).toBeVisible();
-    await expect(page.getByPlaceholder(/描述画面和素材关系|Describe the image/)).toBeVisible();
+    const prompt = page.getByPlaceholder(/描述画面和素材关系|Describe the image/);
+    await expect(page.getByRole("heading", { name: /开始一段新的创作|Start a new creation/ })).toBeVisible();
+    await expect(prompt).toBeVisible();
     await expect(page.locator(".generation-loading, .timeline > .spin")).toHaveCount(0);
+    await expect(page.locator(".generation-main .task")).toHaveCount(0);
+    const starters = page.locator(".starter-prompt");
+    await expect(starters).toHaveCount(3);
+    for (const starter of await starters.all()) await expect(starter).toBeVisible();
+    const geometry = await page.evaluate(() => {
+      const empty = document.querySelector<HTMLElement>(".empty-session")?.getBoundingClientRect();
+      const composer = document.querySelector<HTMLElement>(".generation-main > .composer")?.getBoundingClientRect();
+      const footer = document.querySelector<HTMLElement>(".composer-footer");
+      const submit = document.querySelector<HTMLElement>(".submit-btn")?.getBoundingClientRect();
+      return {
+        centerDelta: empty && composer ? Math.abs(empty.x + empty.width / 2 - composer.x - composer.width / 2) : Number.POSITIVE_INFINITY,
+        overlaps: empty && composer ? empty.bottom > composer.top : true,
+        footerOverflows: footer ? footer.scrollWidth > footer.clientWidth : true,
+        submitOutsideViewport: submit ? submit.left < 0 || submit.right > document.documentElement.clientWidth : true,
+      };
+    });
+    expect(geometry.centerDelta).toBeLessThanOrEqual(1);
+    expect(geometry.overlaps).toBe(false);
+    expect(geometry.footerOverflows).toBe(false);
+    expect(geometry.submitOutsideViewport).toBe(false);
     const audit = await auditDom(page);
     expect(audit.duplicates).toEqual([]);
     expect(audit.horizontalOverflow).toBe(false);
     await expect(page).toHaveScreenshot(`${test.info().project.name}-generate.png`);
+    const starterText = (await starters.first().innerText()).trim();
+    await starters.first().click();
+    await expect(prompt).toHaveValue(starterText);
+  });
+
+  test("generation new-session layout keeps English controls accessible on narrow screens", async ({ page }) => {
+    const sizes = test.info().project.name === "web-tablet-portrait"
+      ? [{ width: 800, height: 1024 }, { width: 768, height: 1024 }]
+      : test.info().project.name === "web-mobile"
+        ? [{ width: 320, height: 568 }, { width: 844, height: 390 }]
+        : [];
+    test.skip(sizes.length === 0, "Runs only on the narrow responsive projects");
+    await page.addInitScript(() => localStorage.setItem("dream-space-language", "en"));
+
+    for (const size of sizes) {
+      await page.setViewportSize(size);
+      await page.goto("/dream_web/generate");
+      await expect(page.getByRole("heading", { name: "Start a new creation" })).toBeVisible();
+      for (const starter of await page.locator(".starter-prompt").all()) await expect(starter).toBeVisible();
+      const geometry = await page.evaluate(() => {
+        const empty = document.querySelector<HTMLElement>(".empty-session")?.getBoundingClientRect();
+        const composer = document.querySelector<HTMLElement>(".generation-main > .composer")?.getBoundingClientRect();
+        const footer = document.querySelector<HTMLElement>(".composer-footer");
+        const submit = document.querySelector<HTMLElement>(".submit-btn")?.getBoundingClientRect();
+        return {
+          centerDelta: empty && composer ? Math.abs(empty.x + empty.width / 2 - composer.x - composer.width / 2) : Number.POSITIVE_INFINITY,
+          overlaps: empty && composer ? empty.bottom > composer.top : true,
+          footerOverflows: footer ? footer.scrollWidth > footer.clientWidth : true,
+          submitOutsideViewport: submit ? submit.left < 0 || submit.right > document.documentElement.clientWidth : true,
+          pageOverflows: document.documentElement.scrollWidth > window.innerWidth + 1,
+        };
+      });
+      expect(geometry.centerDelta).toBeLessThanOrEqual(1);
+      expect(geometry.overlaps).toBe(false);
+      expect(geometry.footerOverflows).toBe(false);
+      expect(geometry.submitOutsideViewport).toBe(false);
+      expect(geometry.pageOverflows).toBe(false);
+    }
+  });
+
+  test("generation mobile history isolates the workspace and restores focus", async ({ page }) => {
+    test.skip(test.info().project.name !== "web-mobile", "Runs only on the mobile project");
+    await page.goto("/dream_web/generate");
+    const toggle = page.getByRole("button", { name: /历史会话|Conversation history/ });
+    await toggle.click();
+    const dialog = page.getByRole("dialog", { name: /历史会话|Conversation history/ });
+    await expect(dialog).toBeVisible();
+    await expect(page.locator(".generation-main")).toHaveAttribute("aria-hidden", "true");
+    expect(await page.locator(".generation-main").evaluate(element => (element as HTMLElement).inert)).toBe(true);
+    expect(await dialog.evaluate(element => element.contains(document.activeElement))).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(toggle).toBeFocused();
+  });
+
+  test("generation recent prompts remain keyboard selectable", async ({ page }) => {
+    test.skip(test.info().project.name !== "web-mobile", "Runs only on the mobile project");
+    await page.addInitScript(() => localStorage.setItem("dream-space-prompt-history", JSON.stringify(["Keyboard prompt"])));
+    await page.goto("/dream_web/generate");
+    const prompt = page.getByPlaceholder(/描述画面和素材关系|Describe the image/);
+    await prompt.focus();
+    const recent = page.getByRole("button", { name: "Keyboard prompt" });
+    await expect(recent).toBeVisible();
+    await page.keyboard.press("Tab");
+    await expect(recent).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(prompt).toHaveValue("Keyboard prompt");
+    await expect(prompt).toBeFocused();
   });
 
   test("generation workspace closes settings when another composer control is selected", async ({ page }) => {

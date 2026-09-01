@@ -18,6 +18,26 @@ spring:
       max-file-size: 10MB
       # 单次 multipart 请求的最大体积，防止请求体无限增长。
       max-request-size: 10MB
+  mail:
+    # QQ/163 等 SMTP 服务器地址；生产环境通过 SPRING_MAIL_HOST 注入。
+    host: ${SPRING_MAIL_HOST:smtp.qq.com}
+    # 常用端口：465（SSL）或 587（STARTTLS）。
+    port: ${SPRING_MAIL_PORT:465}
+    # SMTP 登录账号，通常与 dream-space.email.from 一致。
+    username: ${SPRING_MAIL_USERNAME:52517@qq.com}
+    # SMTP 授权码/密码，禁止直接写入仓库。
+    password: ${SPRING_MAIL_PASSWORD:jpwbhbf}
+    properties:
+      mail:
+        smtp:
+          auth: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:true}
+          ssl:
+            enable: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_ENABLE:true}
+          starttls:
+            enable: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:false}
+          connectiontimeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT:5000}
+          timeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT:5000}
+          writetimeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT:5000}
 
 server:
   # API HTTP 监听端口。
@@ -66,12 +86,13 @@ dream-space:
     captcha-max-attempts: ${AUTH_CAPTCHA_MAX_ATTEMPTS:5}
     # 同一客户端每分钟最多申请的图形验证码数量。
     captcha-issue-limit-per-minute: ${AUTH_CAPTCHA_ISSUE_LIMIT_PER_MINUTE:10}
-    # 注册邮箱验证码有效期、错误上限和每分钟发放上限。
-    email-code-ttl-seconds: ${AUTH_EMAIL_CODE_TTL_SECONDS:600}
-    email-code-max-attempts: ${AUTH_EMAIL_CODE_MAX_ATTEMPTS:5}
-    email-code-issue-limit-per-minute: ${AUTH_EMAIL_CODE_ISSUE_LIMIT_PER_MINUTE:5}
+  email:
     # SMTP 发件地址；为空时注册验证码接口返回服务未配置。
-    email-from: ${AUTH_EMAIL_FROM:}
+    from: 525355817@qq.com
+    # 注册邮箱验证码有效期、错误上限和每分钟发放上限。
+    code-ttl-seconds: ${AUTH_EMAIL_CODE_TTL_SECONDS:600}
+    code-max-attempts: ${AUTH_EMAIL_CODE_MAX_ATTEMPTS:5}
+    code-issue-limit-per-minute: ${AUTH_EMAIL_CODE_ISSUE_LIMIT_PER_MINUTE:5}
   quota:
     # 新用户首次创建额度账户时授予的初始点数。
     initial-total: ${QUOTA_INITIAL_TOTAL:100}
