@@ -12,8 +12,11 @@ public final class ApplyMigration {
   public static void main(String[] args) throws Exception {
     Path migration = Paths.get(args[0]);
     String version = migration.getFileName().toString();
+    String url = args.length > 1 ? args[1] : "jdbc:postgresql://localhost:5432/dream_space";
+    String user = args.length > 2 ? args[2] : "dream_space";
+    String password = args.length > 3 ? args[3] : "123456";
     try (Connection c = DriverManager.getConnection(
-        "jdbc:postgresql://localhost:5432/dream_space", "dream_space", "123456")) {
+        url, user, password)) {
       c.setAutoCommit(false);
       try (PreparedStatement check = c.prepareStatement("SELECT 1 FROM schema_migrations WHERE version=?")) {
         check.setString(1, version);
