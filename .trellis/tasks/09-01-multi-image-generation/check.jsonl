@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/index.md","reason":"Route the reviewer through all backend quality checks affected by API, Worker, persistence, and billing changes."}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Verify additive migrations, transaction boundaries, idempotency constraints, and versioned reconciliation."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Apply backend testing and review expectations to the multi-module generation path."}
+{"file":".trellis/spec/frontend/index.md","reason":"Route the reviewer through frontend component, state, type, and quality checks."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify responsive slot rendering, incremental updates, and regression coverage."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Verify centralized decoding and complete handling of preflight and task event variants."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Audit end-to-end contract consistency and replay behavior across HTTP, queue, database, SSE, and UI boundaries."}

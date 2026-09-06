@@ -5,7 +5,7 @@ import { useGenerationStore } from "./generation";
 
 vi.mock("@/api/client", async () => {
   const actual = await vi.importActual<typeof import("@/api/client")>("@/api/client");
-  return { ...actual, api: { generation: { options: vi.fn(), quota: vi.fn(), sessions: vi.fn(), session: vi.fn(), createSession: vi.fn(), draft: vi.fn(), submit: vi.fn(), uploadReference: vi.fn(), task: vi.fn(), cancel: vi.fn(), retry: vi.fn() } } };
+  return { ...actual, api: { generation: { options: vi.fn(), quota: vi.fn(), sessions: vi.fn(), session: vi.fn(), createSession: vi.fn(), renameSession: vi.fn(), draft: vi.fn(), deleteSession: vi.fn(), submit: vi.fn(), preflight: vi.fn(), preflightStatus: vi.fn(), createFromPreflight: vi.fn(), continueMissing: vi.fn(), uploadReference: vi.fn(), task: vi.fn(), cancel: vi.fn(), retry: vi.fn(), regenerateAll: vi.fn() } } };
 });
 
 class FakeEventSource {
@@ -101,6 +101,24 @@ describe("generation submission flow", () => {
     expect(store.sessions).toEqual([summary]);
     expect(api.generation.createSession).not.toHaveBeenCalled();
     expect(FakeEventSource.instances.every(source => source.closed)).toBe(true);
+  });
+
+  it("removes the session from the server and reconciles history", async () => {
+    const summary = { id: session.id, title: session.title, thumbnailUrl: null, createdAt: session.createdAt, updatedAt: session.updatedAt };
+    vi.mocked(api.generation.sessions)
+      .mockResolvedValueOnce({ items: [summary] })
+      .mockResolvedValueOnce({ items: [] });
+    vi.mocked(api.generation.session).mockResolvedValueOnce({ ...session, tasks: [task] });
+    vi.mocked(api.generation.deleteSession).mockResolvedValueOnce(undefined);
+    const store = useGenerationStore();
+
+    await store.load(session.id);
+    await store.removeSession(session.id);
+
+    expect(api.generation.deleteSession).toHaveBeenCalledWith(session.id);
+    expect(api.generation.sessions).toHaveBeenCalledTimes(2);
+    expect(store.sessions).toEqual([]);
+    expect(store.active).toBeNull();
   });
 
   it("does not resurrect a session when its load resolves after a reset", async () => {
@@ -224,11 +242,13 @@ describe("generation submission flow", () => {
       .mockImplementationOnce(() => newer.promise);
     const store = useGenerationStore();
     await store.load(session.id);
+    vi.mocked(api.generation.quota).mockClear();
     const source = FakeEventSource.instances[0]!;
 
     const olderEmission = source.emit("task.generating", { lastEventId: "1" } as MessageEvent);
     await vi.waitFor(() => expect(api.generation.task).toHaveBeenCalledTimes(1));
-    const newerEmission = source.emit("task.succeeded", { lastEventId: "2" } as MessageEvent);
+    const newerEmission = source.emit("task.succeeded",
+      { type: "task.succeeded", lastEventId: "2" } as MessageEvent);
     await vi.waitFor(() => expect(api.generation.task).toHaveBeenCalledTimes(2));
     newer.resolve({ ...task, status: "succeeded" });
     await newerEmission;
@@ -236,6 +256,7 @@ describe("generation submission flow", () => {
     await olderEmission;
 
     expect(store.active?.tasks[0]?.status).toBe("succeeded");
+    await vi.waitFor(() => expect(api.generation.quota).toHaveBeenCalledTimes(1));
     expect(source.closed).toBe(true);
     store.connectEvents(task.id);
     expect(FakeEventSource.instances.at(-1)?.url).toContain("after=2");
@@ -367,6 +388,7 @@ describe("generation submission flow", () => {
     store.draft.prompt = "A tree";
     vi.mocked(api.generation.submit).mockRejectedValueOnce(new Error("network timeout"));
     await expect(store.submit()).rejects.toThrow("network timeout");
+    expect(store.restorePendingSubmission()).toBe(true);
     vi.mocked(api.generation.submit).mockResolvedValueOnce({ session: { ...session, tasks: [task] }, task, quota, replayed: true });
     await store.submit();
 
@@ -380,11 +402,240 @@ describe("generation submission flow", () => {
     store.draft.prompt = "A tree";
     vi.mocked(api.generation.submit).mockRejectedValueOnce(Object.assign(new Error("publish failed"), { status: 500 }));
     await expect(store.submit()).rejects.toThrow("publish failed");
+    expect(store.restorePendingSubmission()).toBe(true);
     vi.mocked(api.generation.submit).mockResolvedValueOnce({ session: { ...session, tasks: [task] }, task, quota, replayed: true });
     await store.submit();
 
     const calls = vi.mocked(api.generation.submit).mock.calls;
     expect(calls[0]?.[0].idempotencyKey).toBe(calls[1]?.[0].idempotencyKey);
+  });
+
+  it("reuses the ready plan token when preflight task creation loses its response", async () => {
+    vi.mocked(api.generation.options).mockResolvedValueOnce({ ...options,
+      imageCounts: { defaultMode: "AUTO", min: 1, max: 4, values: [1, 2, 3, 4] } });
+    vi.mocked(api.generation.preflight).mockResolvedValueOnce({ status: "ready", planToken: "signed-plan",
+      expiresAt: "2099-01-01T00:00:00Z", collectionMode: "VARIATIONS", targetImageCount: 1,
+      slots: [{ index: 0, label: "Image 1", role: "VARIATION" }],
+      output: { ratio: "1:1", resolution: "2K", width: 2048, height: 2048 },
+      unitCost: 1, estimatedCost: 1, warnings: [] });
+    vi.mocked(api.generation.createFromPreflight)
+      .mockRejectedValueOnce(new Error("network timeout"))
+      .mockResolvedValueOnce({ session: { ...session, tasks: [task] }, task, quota, replayed: true });
+    const store = useGenerationStore();
+    await store.load();
+    store.draft.prompt = "A tree";
+
+    await expect(store.submit()).rejects.toThrow("network timeout");
+    expect(store.restorePendingSubmission()).toBe(true);
+    await store.submit();
+
+    expect(api.generation.preflight).toHaveBeenCalledTimes(1);
+    const calls = vi.mocked(api.generation.createFromPreflight).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.[0]).toEqual(calls[1]?.[0]);
+  });
+
+  it("exposes a preparing submission immediately and replaces it after task creation", async () => {
+    vi.mocked(api.generation.options).mockResolvedValueOnce({ ...options,
+      imageCounts: { defaultMode: "AUTO", min: 1, max: 4, values: [1, 2, 3, 4] } });
+    const pending = deferred<Awaited<ReturnType<typeof api.generation.preflight>>>();
+    vi.mocked(api.generation.preflight).mockReturnValueOnce(pending.promise);
+    vi.mocked(api.generation.createFromPreflight).mockResolvedValueOnce({
+      session: { ...session, draft: { ...baseDraft, prompt: "Generate four related posters" }, tasks: [task] }, task, quota, replayed: false,
+    });
+    const store = useGenerationStore();
+    await store.load();
+    store.draft.prompt = "  Generate four related posters  ";
+    store.draft.imageCountMode = "AUTO";
+    store.draft.imageCount = null;
+
+    const submission = store.submit();
+
+    expect(store.pendingSubmission).toEqual(expect.objectContaining({
+      prompt: "Generate four related posters", imageCountMode: "AUTO", status: "preparing",
+    }));
+    expect(store.draft.prompt).toBe("");
+    expect(store.active).toBeNull();
+    expect(store.quota).toEqual(quota);
+
+    pending.resolve({ status: "ready", planToken: "signed-plan", expiresAt: "2099-01-01T00:00:00Z",
+      collectionMode: "VARIATIONS", targetImageCount: 4,
+      slots: [0, 1, 2, 3].map(index => ({ index, label: `Image ${index + 1}`, role: "VARIATION" })),
+      output: { ratio: "1:1", resolution: "2K", width: 2048, height: 2048 },
+      unitCost: 1, estimatedCost: 4, warnings: [] });
+    await submission;
+
+    expect(store.pendingSubmission).toBeNull();
+    expect(store.active?.id).toBe(session.id);
+    expect(store.draft.prompt).toBe("");
+  });
+
+  it("restores the submitted prompt for editing after preparation fails", async () => {
+    vi.mocked(api.generation.options).mockResolvedValueOnce({ ...options,
+      imageCounts: { defaultMode: "AUTO", min: 1, max: 4, values: [1, 2, 3, 4] } });
+    vi.mocked(api.generation.preflight).mockResolvedValueOnce({
+      id: "preflight-failed", status: "failed", eventsUrl: "/events/preflight-failed",
+      errorCode: "PLANNING_OUTPUT_INVALID", errorDetails: "集合规划输出格式不兼容",
+    });
+    const store = useGenerationStore();
+    await store.load();
+    store.draft.prompt = "Generate related posters";
+
+    await expect(store.submit()).rejects.toThrow("生成准备失败：集合规划输出格式不兼容");
+    expect(store.draft.prompt).toBe("");
+    expect(store.restorePendingSubmission()).toBe(true);
+    expect(store.draft.prompt).toBe("Generate related posters");
+    expect(store.pendingSubmission).toBeNull();
+  });
+
+  it("waits for preflight SSE and exposes frozen planning warnings", async () => {
+    vi.mocked(api.generation.options).mockResolvedValueOnce({ ...options,
+      imageCounts: { defaultMode: "AUTO", min: 1, max: 4, values: [1, 2, 3, 4] } });
+    vi.mocked(api.generation.preflight).mockResolvedValueOnce({
+      id: "preflight-1", status: "queued", eventsUrl: "/api/dream_web/generation/preflights/preflight-1/events",
+    });
+    vi.mocked(api.generation.preflightStatus).mockResolvedValueOnce({
+      status: "ready", planToken: "signed-plan", expiresAt: "2099-01-01T00:00:00Z",
+      collectionMode: "VARIATIONS", targetImageCount: 3,
+      slots: [0, 1, 2].map(index => ({ index, label: `Image ${index + 1}`, role: "VARIATION" })),
+      output: { ratio: "1:1", resolution: "2K", width: 2048, height: 2048 },
+      unitCost: 1, estimatedCost: 3, warnings: ["Using 3 images instead of the 2 requested in the prompt"],
+    });
+    vi.mocked(api.generation.createFromPreflight).mockResolvedValueOnce({
+      session: { ...session, draft: baseDraft, tasks: [task] }, task, quota, replayed: false,
+    });
+    const store = useGenerationStore();
+    await store.load();
+    store.draft.prompt = "Generate two posters";
+    store.draft.imageCountMode = "3";
+    store.draft.imageCount = 3;
+
+    const submission = store.submit();
+    await vi.waitFor(() => expect(FakeEventSource.instances.some(source => source.url.includes("/preflights/"))).toBe(true));
+    const preflightSource = FakeEventSource.instances.find(source => source.url.includes("/preflights/"))!;
+    await preflightSource.emit("preflight.ready", new Event("preflight.ready"));
+    await submission;
+
+    expect(preflightSource.url).toBe("/api/dream_web/generation/preflights/preflight-1/events");
+    expect(preflightSource.closed).toBe(true);
+    expect(api.generation.preflightStatus).toHaveBeenCalledWith("preflight-1");
+    expect(store.notice).toBe("Using 3 images instead of the 2 requested in the prompt");
+  });
+
+  it("continues waiting past the former client timeout until the server is ready", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(api.generation.options).mockResolvedValueOnce({ ...options,
+        imageCounts: { defaultMode: "AUTO", min: 1, max: 4, values: [1, 2, 3, 4] } });
+      vi.mocked(api.generation.preflight).mockResolvedValueOnce({
+        id: "preflight-1", status: "queued", eventsUrl: "/api/dream_web/generation/preflights/preflight-1/events",
+      });
+      let ready = false;
+      vi.mocked(api.generation.preflightStatus).mockImplementation(async () => ready ? {
+        status: "ready", planToken: "signed-plan", expiresAt: "2099-01-01T00:00:00Z",
+        collectionMode: "VARIATIONS", targetImageCount: 1,
+        slots: [{ index: 0, label: "Image 1", role: "VARIATION" }],
+        output: { ratio: "1:1", resolution: "2K", width: 2048, height: 2048 },
+        unitCost: 1, estimatedCost: 1, warnings: [],
+      } : {
+        id: "preflight-1", status: "planning", eventsUrl: "/api/dream_web/generation/preflights/preflight-1/events",
+      });
+      vi.mocked(api.generation.createFromPreflight).mockResolvedValueOnce({
+        session: { ...session, draft: baseDraft, tasks: [task] }, task, quota, replayed: false,
+      });
+      const store = useGenerationStore();
+      await store.load();
+      store.draft.prompt = "Generate four related posters";
+
+      const submission = store.submit();
+      let settled = false;
+      void submission.finally(() => { settled = true; });
+      expect(store.pendingSubmission).toEqual(expect.objectContaining({ status: "preparing" }));
+      await vi.advanceTimersByTimeAsync(125_000);
+
+      expect(settled).toBe(false);
+      expect(store.pendingSubmission).toEqual(expect.objectContaining({ status: "preparing" }));
+      ready = true;
+      await vi.advanceTimersByTimeAsync(5_000);
+      await submission;
+
+      expect(settled).toBe(true);
+      expect(store.pendingSubmission).toBeNull();
+      expect(api.generation.preflightStatus).toHaveBeenCalledWith("preflight-1");
+      expect(FakeEventSource.instances[0]?.closed).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("closes the preflight stream when the conversation changes", async () => {
+    vi.mocked(api.generation.options).mockResolvedValueOnce({ ...options,
+      imageCounts: { defaultMode: "AUTO", min: 1, max: 4, values: [1, 2, 3, 4] } });
+    const pending = deferred<Awaited<ReturnType<typeof api.generation.preflight>>>();
+    vi.mocked(api.generation.preflight).mockReturnValueOnce(pending.promise);
+    const store = useGenerationStore();
+    await store.load();
+    store.draft.prompt = "A tree";
+
+    const submission = store.submit();
+    await vi.waitFor(() => expect(store.pendingSubmission?.status).toBe("preparing"));
+    pending.resolve({ id: "preflight-1", status: "queued", eventsUrl: "/events/preflight-1" });
+    await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+    store.startNewSession();
+
+    expect(source.closed).toBe(true);
+    await expect(submission).rejects.toThrow("生成准备已取消");
+    expect(store.pendingSubmission).toBeNull();
+  });
+
+  it("starts a fresh preflight when retrying a terminal planning failure", async () => {
+    vi.mocked(api.generation.options).mockResolvedValueOnce({ ...options,
+      imageCounts: { defaultMode: "AUTO", min: 1, max: 4, values: [1, 2, 3, 4] } });
+    vi.mocked(api.generation.preflight)
+      .mockResolvedValueOnce({
+        id: "preflight-failed", status: "failed", eventsUrl: "/events/preflight-failed",
+        errorCode: "PLANNING_OUTPUT_INVALID", errorDetails: "集合规划输出格式不兼容",
+      })
+      .mockResolvedValueOnce({
+        status: "ready", planToken: "signed-plan-retry", expiresAt: "2099-01-01T00:00:00Z",
+        collectionMode: "VARIATIONS", targetImageCount: 1,
+        slots: [{ index: 0, label: "Image 1", role: "VARIATION" }],
+        output: { ratio: "1:1", resolution: "2K", width: 2048, height: 2048 },
+        unitCost: 1, estimatedCost: 1, warnings: [],
+      });
+    vi.mocked(api.generation.createFromPreflight).mockResolvedValueOnce({
+      session: { ...session, draft: baseDraft, tasks: [task] }, task, quota, replayed: false,
+    });
+    const store = useGenerationStore();
+    await store.load();
+    store.draft.prompt = "Generate related posters";
+
+    await expect(store.submit()).rejects.toThrow("生成准备失败：集合规划输出格式不兼容");
+    expect(store.restorePendingSubmission()).toBe(true);
+    await store.submit();
+
+    const calls = vi.mocked(api.generation.preflight).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.[0].idempotencyKey).not.toBe(calls[1]?.[0].idempotencyKey);
+  });
+
+  it("maps an expired create response to user-facing preparation language", async () => {
+    vi.mocked(api.generation.options).mockResolvedValueOnce({ ...options,
+      imageCounts: { defaultMode: "AUTO", min: 1, max: 4, values: [1, 2, 3, 4] } });
+    vi.mocked(api.generation.preflight).mockResolvedValueOnce({ status: "ready", planToken: "signed-plan",
+      expiresAt: "2099-01-01T00:00:00Z", collectionMode: "VARIATIONS", targetImageCount: 1,
+      slots: [{ index: 0, label: "Image 1", role: "VARIATION" }],
+      output: { ratio: "1:1", resolution: "2K", width: 2048, height: 2048 },
+      unitCost: 1, estimatedCost: 1, warnings: [] });
+    vi.mocked(api.generation.createFromPreflight).mockRejectedValueOnce(
+      Object.assign(new Error("预规划已过期，请重新提交"), { status: 400, code: "GENERATION_PREFLIGHT_EXPIRED" }));
+    const store = useGenerationStore();
+    await store.load();
+    store.draft.prompt = "A tree";
+
+    await expect(store.submit()).rejects.toThrow("预规划已过期，请重新提交");
+    expect(store.pendingSubmission?.error).toBe("这次生成准备已过期，请重新提交");
   });
 
   it("uses a new idempotency key after explicitly starting a new conversation", async () => {

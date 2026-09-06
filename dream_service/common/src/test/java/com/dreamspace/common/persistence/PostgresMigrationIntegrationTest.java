@@ -85,7 +85,7 @@ class PostgresMigrationIntegrationTest {
                   + "WHERE role_permission.\"roleId\" = 'admin-role-admin')");
           var result = statement.executeQuery()) {
         assertThat(result.next()).isTrue();
-        assertThat(result.getInt(1)).isEqualTo(34);
+        assertThat(result.getInt(1)).isEqualTo(36);
         assertThat(result.getInt(2)).isEqualTo(23);
         assertThat(result.getInt(3)).isEqualTo(1);
         assertThat(result.getInt(4)).isEqualTo(3);

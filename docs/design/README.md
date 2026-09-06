@@ -24,6 +24,7 @@
 18. [用户账单、用户管理、计费规则与支付订单设计](./18-billing-user-management-and-payments.md)
 19. [管理端运营能力详细设计](./19-admin-operations-capabilities.md)
 20. [未实现功能补齐设计](./20-unimplemented-features-design.md)
+21. [多图片生成与失败续生成设计](./21-multi-image-generation-and-failure-retry.md)
 
 ## 实施规则
 

@@ -22,7 +22,7 @@ spring:
   ai:
     openai:
       # 规划与评估多模态模型密钥；必须通过 Secret 注入，不提供本地默认值。
-      api-key: sk-6c87d142cf04c29144dee6de0e4d7d31
+      api-key: sk-6c87d142cf04c290359de0e4d7d31
       # 必须填写 OpenAI-compatible API 根地址，例如 https://provider.example/v1。
       # Spring AI 会在此地址后追加 /chat/completions；不要填写完整接口 URL。
       base-url: https://api.honglin.asia/v1
@@ -105,7 +105,7 @@ dream-space:
       # 图片生成服务根地址，不复用规划 ChatModel 地址。
       base-url: https://api.honglin.asia
       # 图片模型独立密钥；禁止与规划密钥在日志或响应中输出。
-      api-key: sk-6c87d142cf04c4dee64d7d31
+      api-key: sk-9efa40398ee975a5af5
       # 专用图片生成模型名称。
       model: gpt-image-2
       # OpenAI-compatible 图片生成接口路径。
@@ -138,6 +138,9 @@ dream-space:
     reconciliation-initial-delay-ms: ${RECONCILIATION_INITIAL_DELAY_MS:60000}
     # 两次额度对账任务之间的固定等待时间，单位为毫秒。
     reconciliation-delay-ms: ${RECONCILIATION_DELAY_MS:3600000}
+    # Maximum number of image slots generated concurrently in one v2 execution.
+    # The processor clamps this value to the supported 1-4 slot range.
+    slot-concurrency: ${GENERATION_SLOT_CONCURRENCY:4}
 
     # Model readiness is probed independently from queue polling.
     model-health:

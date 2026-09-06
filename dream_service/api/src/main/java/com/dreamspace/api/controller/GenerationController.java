@@ -4,6 +4,7 @@ import com.dreamspace.api.common.ApiException;
 import com.dreamspace.api.common.CookieSupport;
 import com.dreamspace.api.service.AuthService;
 import com.dreamspace.api.service.GenerationService;
+import com.dreamspace.api.service.CollectionPreflightService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import org.springframework.http.HttpHeaders;
@@ -28,10 +29,11 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class GenerationController {
   private final GenerationService service;
   private final AuthService auth;
+  private final CollectionPreflightService preflights;
 
-  public GenerationController(GenerationService service, AuthService auth) {
-    this.service = service;
-    this.auth = auth;
+  public GenerationController(GenerationService service, AuthService auth,
+      CollectionPreflightService preflights) {
+    this.service = service; this.auth = auth; this.preflights = preflights;
   }
 
   @GetMapping("/options")
@@ -70,7 +72,32 @@ public class GenerationController {
 
   @PostMapping("/tasks")
   GenerationService.SubmitResponse submit(@RequestBody GenerationService.TaskRequest body, HttpServletRequest request) {
+    if (body != null && body.planToken() != null) {
+      return preflights.create(user(request), new CollectionPreflightService.CreateRequest(body.idempotencyKey(), body.planToken()));
+    }
     return service.submit(user(request), body);
+  }
+
+  @PostMapping("/preflights")
+  Object preflight(@RequestBody CollectionPreflightService.Request body, HttpServletRequest request) {
+    return preflights.preflight(user(request), body);
+  }
+
+  @GetMapping("/preflights/{preflightId}")
+  Object preflight(@PathVariable String preflightId, HttpServletRequest request) {
+    return preflights.get(user(request), preflightId);
+  }
+
+  @GetMapping(value = "/preflights/{preflightId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+  SseEmitter preflightEvents(@PathVariable String preflightId,
+      @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId,
+      @RequestParam(value = "after", required = false, defaultValue = "0") long after,
+      HttpServletRequest request) {
+    long cursor = after;
+    if (lastEventId != null && !lastEventId.isBlank()) {
+      try { cursor = Long.parseLong(lastEventId); } catch (NumberFormatException ignored) { cursor = after; }
+    }
+    return preflights.events(user(request), preflightId, cursor);
   }
 
   @GetMapping("/tasks/{taskId}")
@@ -86,6 +113,10 @@ public class GenerationController {
 
   @PostMapping("/tasks/{taskId}/retry")
   GenerationService.SubmitResponse retry(@PathVariable String taskId, HttpServletRequest request) { return service.retry(user(request), taskId); }
+
+  @PostMapping("/tasks/{taskId}/continue")
+  GenerationService.SubmitResponse continueMissing(@PathVariable String taskId, @RequestBody(required = false) ContinueRequest body,
+      HttpServletRequest request) { return service.continueMissing(user(request), taskId, body == null ? null : body.idempotencyKey()); }
 
   @GetMapping(value = "/tasks/{taskId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
   SseEmitter events(@PathVariable String taskId, @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId,
@@ -121,4 +152,5 @@ public class GenerationController {
 
   public record SessionsResponse(List<GenerationService.SessionSummary> items) {}
   public record RenameRequest(String title) {}
+  public record ContinueRequest(String idempotencyKey) {}
 }

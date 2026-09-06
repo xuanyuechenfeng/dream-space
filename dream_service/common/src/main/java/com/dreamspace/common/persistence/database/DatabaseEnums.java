@@ -7,6 +7,11 @@ public final class DatabaseEnums {
   public enum InspirationStatus implements DatabaseValue { DRAFT, PUBLISHED, ARCHIVED; public String databaseValue() { return name(); } }
   public enum InspirationSourceType implements DatabaseValue { AI_PUBLIC_GALLERY, LICENSED, INTERNAL; public String databaseValue() { return name(); } }
   public enum GenerationTaskStatus implements DatabaseValue { QUEUED, GENERATING, SUCCEEDED, PARTIALLY_SUCCEEDED, FAILED, CANCELLED; public String databaseValue() { return name(); } }
+  public enum CollectionMode implements DatabaseValue { VARIATIONS, DIMENSIONAL, SEQUENCE; public String databaseValue() { return name(); } }
+  public enum GenerationSlotStatus implements DatabaseValue { WAITING, GENERATING, SUCCEEDED, FAILED, CANCELLED; public String databaseValue() { return name(); } }
+  public enum GenerationExecutionKind implements DatabaseValue { INITIAL, CONTINUATION; public String databaseValue() { return name(); } }
+  public enum GenerationExecutionStatus implements DatabaseValue { QUEUED, GENERATING, SUCCEEDED, FAILED, CANCELLED; public String databaseValue() { return name(); } }
+  public enum GenerationPreflightStatus implements DatabaseValue { QUEUED, PLANNING, READY, NEEDS_CLARIFICATION, FAILED, CONSUMED, EXPIRED, SUPERSEDED; public String databaseValue() { return name(); } }
   public enum GenerationInputMode implements DatabaseValue { AUTO, TEXT_TO_IMAGE, EDIT_IMAGE, RECOMPOSE_IMAGE; public String databaseValue() { return name(); } }
   public enum GenerationPlanStatus implements DatabaseValue { PLANNING, RUNNABLE, NEEDS_CLARIFICATION, FAILED; public String databaseValue() { return name(); } }
   public enum GenerationIterationStatus implements DatabaseValue { GENERATED, EVALUATING, ACCEPTED, REFINING, FAILED; public String databaseValue() { return name(); } }

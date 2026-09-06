@@ -56,10 +56,14 @@ export const api = {
     draft: (id: string, draft: GenerationDraft) => request<GenerationSession>(`/dream_web/generation/sessions/${encodeURIComponent(id)}/draft`, { method: "PATCH", body: JSON.stringify(draft) }),
     deleteSession: (id: string) => request<void>(`/dream_web/generation/sessions/${encodeURIComponent(id)}`, { method: "DELETE" }),
     submit: (payload: GenerationTaskRequest) => request<GenerationSubmitResponse>("/dream_web/generation/tasks", { method: "POST", body: JSON.stringify(payload) }),
+    preflight: (payload: GenerationPreflightRequest) => request<GenerationPreflightResponse>("/dream_web/generation/preflights", { method: "POST", body: JSON.stringify(payload) }),
+    preflightStatus: (id: string) => request<GenerationPreflightResponse>(`/dream_web/generation/preflights/${encodeURIComponent(id)}`),
+    createFromPreflight: (payload: GenerationCreateRequest) => request<GenerationSubmitResponse>("/dream_web/generation/tasks", { method: "POST", body: JSON.stringify(payload) }),
     task: (id: string) => request<GenerationTask>(`/dream_web/generation/tasks/${encodeURIComponent(id)}`),
     plan: (id: string) => request<GenerationPlan>(`/dream_web/generation/tasks/${encodeURIComponent(id)}/plan`),
     cancel: (id: string) => request<GenerationTask>(`/dream_web/generation/tasks/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
     retry: (id: string) => request<GenerationSubmitResponse>(`/dream_web/generation/tasks/${encodeURIComponent(id)}/retry`, { method: "POST" }),
+    continueMissing: (id: string, idempotencyKey: string) => request<GenerationSubmitResponse>(`/dream_web/generation/tasks/${encodeURIComponent(id)}/continue`, { method: "POST", body: JSON.stringify({ idempotencyKey }) }),
     uploadReference: (file: File) => { const body = new FormData(); body.append("file", file); return request<ReferenceUpload>("/dream_web/uploads/references", { method: "POST", body }); },
   },
   moderation: {
@@ -96,15 +100,24 @@ export type GenerationRatio = "smart" | "21:9" | "16:9" | "3:2" | "4:3" | "1:1" 
 export type GenerationResolution = "2K" | "4K";
 export interface GenerationRatioOption { value: Exclude<GenerationRatio, "custom">; label: string }
 export interface GenerationResolutionOption { value: GenerationResolution; label: string; maxEdge: number; maxPixels: number; unitCost: number; enabled: boolean; disabledReason?: string | null }
-export interface GenerationOptions { modes: GenerationMode[]; ratios: GenerationRatioOption[]; resolutions: GenerationResolutionOption[]; dimensions: { minEdge: number; step: number }; referenceImages: { max: number; maxBytes: number; mimeTypes: string[] } }
+export interface GenerationOptions { modes: GenerationMode[]; ratios: GenerationRatioOption[]; resolutions: GenerationResolutionOption[]; dimensions: { minEdge: number; step: number }; referenceImages: { max: number; maxBytes: number; mimeTypes: string[] }; imageCounts?: { defaultMode: "AUTO"; min: number; max: number; values: number[] } }
 export interface GenerationQuota { total: number; available: number; reserved: number; used: number; remainingPercent: number }
-export interface GenerationDraft { mode: GenerationMode; prompt: string; imageIds: string[]; ratio: GenerationRatio; resolution: GenerationResolution; width: number | null; height: number | null }
+export type GenerationCountMode = "AUTO" | "1" | "2" | "3" | "4";
+export interface GenerationDraft { mode: GenerationMode; prompt: string; imageIds: string[]; ratio: GenerationRatio; resolution: GenerationResolution; width: number | null; height: number | null; imageCountMode?: GenerationCountMode; imageCount?: number | null }
 export interface GenerationSessionSummary { id: string; title: string; thumbnailUrl?: string | null; createdAt: string; updatedAt: string }
 export interface GenerationSession extends GenerationSessionSummary { draft?: GenerationDraft | null; tasks: GenerationTask[] }
 export interface GenerationTaskRequest extends GenerationDraft { idempotencyKey: string; sessionId?: string }
 export interface GenerationResult { id: string; index: number; contentUrl: string; thumbnailUrl: string; width: number; height: number; mimeType: string; byteSize: number; isAiGenerated: boolean; moderationStatus?: string | null }
-export interface GenerationTask extends GenerationTaskRequest { id: string; status: string; model: string; imageCount: 1; unitCost: number; totalCost: number; planStatus?: string | null; currentStage?: string | null; currentIteration: number; evaluationScore?: number | null; errorCode?: string | null; errorMessage?: string | null; startedAt?: string | null; completedAt?: string | null; createdAt: string; updatedAt: string; results: GenerationResult[] }
+export type GenerationSlotStatus = "waiting" | "generating" | "succeeded" | "failed" | "cancelled";
+export interface GenerationSlot { index: number; label: string; role: string; status: GenerationSlotStatus; result?: GenerationResult | null; errorCode?: string | null; errorMessage?: string | null }
+export interface GenerationTask extends GenerationDraft { id: string; sessionId: string; idempotencyKey?: string; status: string; model: string; imageCount: number; unitCost: number; totalCost: number; estimatedCost?: number; consumedCost?: number; successfulCount?: number; missingCount?: number; collectionMode?: string | null; slots?: GenerationSlot[]; planStatus?: string | null; currentStage?: string | null; currentIteration: number; evaluationScore?: number | null; errorCode?: string | null; errorMessage?: string | null; startedAt?: string | null; completedAt?: string | null; createdAt: string; updatedAt: string; results: GenerationResult[] }
 export interface GenerationSubmitResponse { session: GenerationSession; task: GenerationTask; quota: GenerationQuota; replayed: boolean }
 export interface GenerationPlan { taskId: string; status: string; requirement: unknown; structure: unknown; visual: unknown; promptPackage: unknown; iterations: unknown[] }
+export interface GenerationPreflightRequest { idempotencyKey: string; draftKey: string; sessionId?: string; prompt: string; imageIds: string[]; ratio: GenerationRatio; resolution: GenerationResolution; width: number | null; height: number | null; imageCountMode?: GenerationCountMode; imageCount?: number | null }
+export interface GenerationPreflightSlot { index: number; label: string; role: string }
+export interface GenerationPreflightReady { status: "ready"; planToken: string; expiresAt: string; collectionMode: string; targetImageCount: number; slots: GenerationPreflightSlot[]; output: { ratio: GenerationRatio; resolution: GenerationResolution; width: number | null; height: number | null }; unitCost: number; estimatedCost: number; warnings: string[] }
+export interface GenerationPreflightPending { id: string; status: string; eventsUrl: string; errorCode?: string | null; errorDetails?: string | null }
+export type GenerationPreflightResponse = GenerationPreflightReady | GenerationPreflightPending;
+export interface GenerationCreateRequest { idempotencyKey: string; planToken: string }
 export interface ReferenceUpload { id: string; url: string; filename: string; mimeType: string; width: number; height: number; byteSize: number; checksumSha256: string }
 export interface ModerationCase { id: string; taskId: string; stage: string; status: string; reasonCode: string; createdAt: string; resolvedAt?: string | null; appeal?: { id: string; reason: string; status: string; createdAt: string; resolvedAt?: string | null } | null }

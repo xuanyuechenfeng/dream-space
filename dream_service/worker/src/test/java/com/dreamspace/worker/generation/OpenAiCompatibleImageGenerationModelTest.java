@@ -48,4 +48,23 @@ class OpenAiCompatibleImageGenerationModelTest {
     assertThat(preview).contains("<redacted-image-payload>", "https://image.example/result.png")
         .doesNotContain("sensitive-image-data");
   }
+
+  @Test
+  void derivesStableButDistinctRequestIdsForEachQualityIteration() {
+    String first = OpenAiCompatibleImageGenerationModel.deterministicRequestId(
+        "task-1", "execution-1", 2, 3, 1, "execution-1:2");
+    String replay = OpenAiCompatibleImageGenerationModel.deterministicRequestId(
+        "task-1", "execution-1", 2, 3, 1, "execution-1:2");
+    String refined = OpenAiCompatibleImageGenerationModel.deterministicRequestId(
+        "task-1", "execution-1", 2, 3, 2, "execution-1:2");
+    String nextSlot = OpenAiCompatibleImageGenerationModel.deterministicRequestId(
+        "task-1", "execution-1", 3, 1, 1, "execution-1:2");
+
+    assertThat(first).isEqualTo(replay)
+        .startsWith("dream-")
+        .hasSize(38);
+    assertThat(refined).isNotEqualTo(first);
+    assertThat(nextSlot).isNotEqualTo(first);
+  }
+
 }

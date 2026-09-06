@@ -28,9 +28,23 @@ class DreamSpacePropertiesTest {
   @Test
   void secureCookiesAreExplicitlyConfigured() {
     var properties = new DreamSpaceProperties(null, null, null, null, null, null,
-        new DreamSpaceProperties.Security(true));
+        new DreamSpaceProperties.Security(true, null));
 
     assertThat(properties.security().secureCookies()).isTrue();
+  }
+
+  @Test
+  void bindsSecurityConfigurationUsingAllRecordComponents() {
+    var source = new MapConfigurationPropertySource(Map.of(
+        "dream-space.security.secure-cookies", "true",
+        "dream-space.security.preflight-token-secret", "test-preflight-secret"));
+
+    var properties = new Binder(source)
+        .bind("dream-space", Bindable.of(DreamSpaceProperties.class))
+        .orElseThrow(IllegalStateException::new);
+
+    assertThat(properties.security()).isEqualTo(
+        new DreamSpaceProperties.Security(true, "test-preflight-secret"));
   }
 
   @Test

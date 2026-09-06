@@ -58,10 +58,22 @@ public final class OpenAiCompatibleImageGenerationModel implements ImageGenerati
           .put("size", request.task().width() == null ? request.task().resolution().databaseValue()
               : request.task().width() + "x" + request.task().height())
           .put("aspect_ratio", request.task().ratio().databaseValue());
-      if (request.targetImageId() != null) addInputImage(body, request.task(), request.targetImageId());
-      if (request.referenceImageId() != null) addInputImage(body, request.task(), request.referenceImageId());
+      List<String> inputImageIds = request.inputImageIds().isEmpty()
+          ? java.util.stream.Stream.of(request.targetImageId(), request.referenceImageId())
+              .filter(java.util.Objects::nonNull).distinct().toList()
+          : request.inputImageIds().stream().filter(java.util.Objects::nonNull).distinct().toList();
+      for (String imageId : inputImageIds) addInputImage(body, request.task(), imageId);
       if (request.refinement() != null) body.set("refinement", json.valueToTree(request.refinement()));
-      String clientRequestId = UUID.randomUUID().toString();
+      // A retry/re-delivery must address the same provider request. The slot
+      // index is frozen in the collection prompt package, so derive the
+      // client id from stable task/slot/attempt data instead of a random UUID.
+      Object rawSlotIndex = request.promptPackage().modelInput() == null
+          ? null : request.promptPackage().modelInput().get("slotIndex");
+      int slotIndex = request.slotIndex() == null
+          ? rawSlotIndex instanceof Number number ? number.intValue() : 0
+          : request.slotIndex();
+      String clientRequestId = deterministicRequestId(request.task().id(), request.executionId(),
+          slotIndex, request.slotAttempt(), request.iteration(), attempt.key());
       HttpRequest httpRequest = HttpRequest.newBuilder(URI.create(baseUrl + endpoint)).timeout(requestTimeout)
           .header("Authorization", "Bearer " + apiKey).header("Content-Type", "application/json")
           .header("X-Client-Request-Id", clientRequestId)
@@ -231,6 +243,14 @@ public final class OpenAiCompatibleImageGenerationModel implements ImageGenerati
   }
   private static String redactRequestId(String value) {
     return value == null || value.isBlank() ? null : "sha256:" + GenerationHarness.hash(value).substring(0, 16);
+  }
+  static String deterministicRequestId(String taskId, String executionId, int slotIndex,
+      Integer slotAttempt, int iteration, String attemptKey) {
+    String execution = executionId == null ? "legacy" : executionId;
+    String slotAttemptValue = slotAttempt == null ? "legacy" : slotAttempt.toString();
+    return "dream-" + GenerationHarness.hash(taskId + ":execution:" + execution + ":slot:"
+        + slotIndex + ":slot-attempt:" + slotAttemptValue + ":iteration:" + iteration
+        + ":attempt:" + attemptKey).substring(0, 32);
   }
   private static boolean privateHost(String host) { try { InetAddress address=InetAddress.getByName(host); return address.isAnyLocalAddress()||address.isLoopbackAddress()||address.isLinkLocalAddress()||address.isSiteLocalAddress(); } catch(Exception e){ return true; } }
   private static GenerationProviderException invalid(String message, Throwable cause) { return new GenerationProviderException("PROVIDER_OUTPUT_INVALID", message, false, cause); }

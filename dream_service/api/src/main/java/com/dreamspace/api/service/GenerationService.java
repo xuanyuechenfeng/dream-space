@@ -11,6 +11,9 @@ import com.dreamspace.common.persistence.generation.GenerationResultRecord;
 import com.dreamspace.common.persistence.generation.GenerationSessionRecord;
 import com.dreamspace.common.persistence.generation.GenerationTaskEventRecord;
 import com.dreamspace.common.persistence.generation.GenerationTaskRecord;
+import com.dreamspace.common.persistence.generation.GenerationResultSlotRecord;
+import com.dreamspace.common.persistence.generation.GenerationV2Mapper;
+import com.dreamspace.common.persistence.generation.GenerationExecutionRecord;
 import com.dreamspace.common.persistence.quota.QuotaAccountRecord;
 import com.dreamspace.common.persistence.quota.QuotaTransactionService;
 import com.dreamspace.common.persistence.storage.ObjectStorage;
@@ -51,6 +54,7 @@ public class GenerationService {
   private final ObjectMapper objectMapper;
   private final ReferenceUploadMapper uploads;
   private final BillingMapper billing;
+  private final GenerationV2Mapper v2;
   private final TransactionTemplate transactions;
   private final ExecutorService sseExecutor = Executors.newCachedThreadPool(r -> {
     Thread thread = new Thread(r, "dream-space-generation-sse");
@@ -61,12 +65,17 @@ public class GenerationService {
   public GenerationService(GenerationMapper mapper, QuotaTransactionService quota, GenerationQueuePublisher queuePublisher,
       ObjectStorageFactory storage, DreamSpaceProperties properties, ObjectMapper objectMapper,
       PlatformTransactionManager transactionManager, ReferenceUploadMapper uploads) {
-    this(mapper, quota, queuePublisher, storage, properties, objectMapper, transactionManager, uploads, null);
+    this(mapper, quota, queuePublisher, storage, properties, objectMapper, transactionManager, uploads, null, null);
+  }
+  public GenerationService(GenerationMapper mapper, QuotaTransactionService quota, GenerationQueuePublisher queuePublisher,
+      ObjectStorageFactory storage, DreamSpaceProperties properties, ObjectMapper objectMapper,
+      PlatformTransactionManager transactionManager, ReferenceUploadMapper uploads, BillingMapper billing) {
+    this(mapper, quota, queuePublisher, storage, properties, objectMapper, transactionManager, uploads, billing, null);
   }
   @org.springframework.beans.factory.annotation.Autowired
   public GenerationService(GenerationMapper mapper, QuotaTransactionService quota, GenerationQueuePublisher queuePublisher,
       ObjectStorageFactory storage, DreamSpaceProperties properties, ObjectMapper objectMapper,
-      PlatformTransactionManager transactionManager, ReferenceUploadMapper uploads, BillingMapper billing) {
+      PlatformTransactionManager transactionManager, ReferenceUploadMapper uploads, BillingMapper billing, GenerationV2Mapper v2) {
     this.mapper = mapper;
     this.quota = quota;
     this.queuePublisher = queuePublisher;
@@ -75,17 +84,39 @@ public class GenerationService {
     this.objectMapper = objectMapper;
     this.uploads = uploads;
     this.billing = billing;
+    this.v2 = v2;
     this.transactions = new TransactionTemplate(transactionManager);
   }
 
   @JsonIgnoreProperties(ignoreUnknown = false)
   public record Draft(String mode, String prompt, List<String> imageIds, String ratio,
-      String resolution, Integer width, Integer height) {}
+      String resolution, Integer width, Integer height, String imageCountMode, Integer imageCount) {
+    public Draft(String mode, String prompt, List<String> imageIds, String ratio,
+        String resolution, Integer width, Integer height) {
+      this(mode, prompt, imageIds, ratio, resolution, width, height, "AUTO", null);
+    }
+  }
   @JsonIgnoreProperties(ignoreUnknown = false)
   public record TaskRequest(String idempotencyKey, String sessionId, String mode, String prompt,
-      List<String> imageIds, String ratio, String resolution, Integer width, Integer height) {}
+      List<String> imageIds, String ratio, String resolution, Integer width, Integer height, String planToken,
+      String imageCountMode, Integer imageCount) {
+    public TaskRequest(String idempotencyKey, String sessionId, String mode, String prompt,
+        List<String> imageIds, String ratio, String resolution, Integer width, Integer height) {
+      this(idempotencyKey, sessionId, mode, prompt, imageIds, ratio, resolution, width, height, null, "AUTO", null);
+    }
+    public TaskRequest(String idempotencyKey, String sessionId, String mode, String prompt,
+        List<String> imageIds, String ratio, String resolution, Integer width, Integer height, String planToken) {
+      this(idempotencyKey, sessionId, mode, prompt, imageIds, ratio, resolution, width, height, planToken, "AUTO", null);
+    }
+  }
   public record Options(List<String> modes, List<RatioOption> ratios, List<ResolutionOption> resolutions,
-      DimensionLimits dimensions, ReferenceLimits referenceImages) {}
+      DimensionLimits dimensions, ReferenceLimits referenceImages, ImageCountOptions imageCounts) {
+    public Options(List<String> modes, List<RatioOption> ratios, List<ResolutionOption> resolutions,
+        DimensionLimits dimensions, ReferenceLimits referenceImages) {
+      this(modes, ratios, resolutions, dimensions, referenceImages, new ImageCountOptions("AUTO", 1, 4, List.of(1,2,3,4)));
+    }
+  }
+  public record ImageCountOptions(String defaultMode, int min, int max, List<Integer> values) {}
   public record RatioOption(String value, String label) {}
   public record ResolutionOption(String value, String label, int maxEdge, long maxPixels, int unitCost,
       boolean enabled, String disabledReason) {}
@@ -97,12 +128,26 @@ public class GenerationService {
       List<TaskView> tasks) {}
   public record ResultView(String id, int index, String contentUrl, String thumbnailUrl, int width, int height,
       String mimeType, int byteSize, boolean isAiGenerated, String moderationStatus) {}
+  public record SlotView(int index, String label, String role, String status, ResultView result,
+      String errorCode, String errorMessage) {}
   public record TaskView(String id, String sessionId, String status, String mode, String prompt,
       List<String> imageIds, String model, String ratio, String resolution, Integer width, Integer height,
       int imageCount, int unitCost, int totalCost,
       String errorCode, String errorMessage, Instant startedAt, Instant completedAt, Instant createdAt,
       Instant updatedAt, String planStatus, String currentStage, int currentIteration, Double evaluationScore,
-      List<ResultView> results) {}
+      List<ResultView> results, int consumedCost, int successfulCount, int missingCount,
+      String collectionMode, List<SlotView> slots) {
+    public TaskView(String id, String sessionId, String status, String mode, String prompt,
+        List<String> imageIds, String model, String ratio, String resolution, Integer width, Integer height,
+        int imageCount, int unitCost, int totalCost, String errorCode, String errorMessage, Instant startedAt,
+        Instant completedAt, Instant createdAt, Instant updatedAt, String planStatus, String currentStage,
+        int currentIteration, Double evaluationScore, List<ResultView> results) {
+      this(id, sessionId, status, mode, prompt, imageIds, model, ratio, resolution, width, height, imageCount,
+          unitCost, totalCost, errorCode, errorMessage, startedAt, completedAt, createdAt, updatedAt, planStatus,
+          currentStage, currentIteration, evaluationScore, results, 0, results == null ? 0 : results.size(),
+          Math.max(0, imageCount - (results == null ? 0 : results.size())), null, List.of());
+    }
+  }
   public record SubmitResponse(SessionDetail session, TaskView task, QuotaView quota, boolean replayed) {}
   public record EventView(long id, String taskId, String type, String status, JsonNode payload, Instant createdAt) {}
   public record PlanView(String taskId, String status, JsonNode requirement, JsonNode structure, JsonNode visual,
@@ -157,9 +202,19 @@ public class GenerationService {
 
   public void deleteSession(String userId, String sessionId) {
     ownedSession(userId, sessionId);
-    if (mapper.countActiveTasks(sessionId) > 0) throw bad("SESSION_ACTIVE", "生成任务进行中，暂不能删除会话");
     transactions.executeWithoutResult(status -> {
-      if (mapper.deleteSession(userId, sessionId) != 1) throw bad("NOT_FOUND", "会话不存在");
+      int activeTasks = mapper.countActiveTasks(sessionId);
+      int activePreflights = mapper.countActivePreflights(sessionId);
+      if (activeTasks > 0 || activePreflights > 0) {
+        throw bad("SESSION_ACTIVE", "生成任务进行中，暂不能删除会话");
+      }
+      if (mapper.deleteSession(userId, sessionId) == 1) return;
+      // The delete SQL repeats the activity guard so a task/preflight that
+      // starts between the checks cannot be removed accidentally.
+      if (mapper.findSession(userId, sessionId) != null) {
+        throw bad("SESSION_ACTIVE", "生成任务进行中，暂不能删除会话");
+      }
+      throw bad("NOT_FOUND", "会话不存在");
     });
   }
 
@@ -188,6 +243,21 @@ public class GenerationService {
     return taskView(ownedTask(userId, taskId));
   }
 
+  /** Validates and normalizes reference IDs for the asynchronous preflight path. */
+  public List<String> validateReferenceIds(String userId, List<String> values) {
+    return normalizeImageIds(userId, values);
+  }
+
+  /** Public projection used by the v2 preflight/create workflow. */
+  public TaskView viewTask(String userId, String taskId) { return getTask(userId, taskId); }
+
+  /** Keeps v2 submission behavior aligned with the legacy task path. */
+  void clearSubmittedDraft(String userId, String sessionId) {
+    if (mapper.updateDraft(userId, sessionId, json(defaultDraft())) != 1) {
+      throw new IllegalStateException("generation session draft was not cleared");
+    }
+  }
+
   public PlanView getPlan(String userId, String taskId) {
     ownedTask(userId, taskId);
     GenerationPlanRecord plan = mapper.findPlan(taskId);
@@ -201,6 +271,10 @@ public class GenerationService {
     GenerationTaskRecord task = ownedTask(userId, taskId);
     if (task.status() != GenerationTaskStatus.QUEUED && task.status() != GenerationTaskStatus.GENERATING)
       throw bad("TASK_NOT_CANCELLABLE", "当前任务不能取消");
+    if (task.settlementVersionValue() == 2 && v2 != null) {
+      transactions.executeWithoutResult(status -> cancelV2(userId, taskId));
+      return getTask(userId, taskId);
+    }
     transactions.executeWithoutResult(status -> {
       if (mapper.cancel(userId, taskId) != 1) throw bad("TASK_NOT_CANCELLABLE", "当前任务不能取消");
       if (!quota.settle(userId, taskId, task.totalCost(), "RELEASE", taskId + ":release"))
@@ -215,6 +289,8 @@ public class GenerationService {
     if (task.status() != GenerationTaskStatus.FAILED && task.status() != GenerationTaskStatus.CANCELLED
         && task.status() != GenerationTaskStatus.PARTIALLY_SUCCEEDED)
       throw bad("TASK_NOT_RETRYABLE", "当前任务不能重试");
+    if (task.settlementVersionValue() == 2)
+      throw bad("TASK_USE_CONTINUE_OR_REGENERATE", "多图片任务请使用继续生成缺失图片或全部重新生成");
     return submit(userId, new TaskRequest("retry-" + task.id() + "-" + UUID.randomUUID(), task.sessionId(),
         "AUTO", task.prompt(), imageIds(task), task.ratio().databaseValue(),
         task.resolution().databaseValue(), task.width(), task.height()));
@@ -324,7 +400,8 @@ public class GenerationService {
         .filter(java.util.Objects::nonNull).map(String::trim).filter(value -> !value.isEmpty()).distinct().toList();
     if (ids.size() > 2) throw bad("GENERATION_IMAGES_INVALID", "最多添加两张图片");
     OutputParameters output = validateOutput(draft.ratio(), draft.resolution(), draft.width(), draft.height());
-    return new Draft("AUTO", prompt, ids, output.ratio(), output.resolution(), output.width(), output.height());
+    return new Draft("AUTO", prompt, ids, output.ratio(), output.resolution(), output.width(), output.height(),
+        draft.imageCountMode() == null ? "AUTO" : draft.imageCountMode(), draft.imageCount());
   }
 
   private static Draft defaultDraft() {
@@ -378,7 +455,10 @@ public class GenerationService {
   private Draft draftView(JsonNode value) {
     if (value == null || value.isNull()) return defaultDraft();
     try {
-      return objectMapper.treeToValue(value, Draft.class);
+      Draft draft = objectMapper.treeToValue(value, Draft.class);
+      return draft.imageCountMode() == null
+          ? new Draft(draft.mode(), draft.prompt(), draft.imageIds(), draft.ratio(), draft.resolution(), draft.width(), draft.height(), "AUTO", draft.imageCount())
+          : draft;
     } catch (com.fasterxml.jackson.core.JsonProcessingException error) {
       throw new IllegalStateException("generation session draft is invalid", error);
     }
@@ -397,11 +477,105 @@ public class GenerationService {
     Double score = latest == null || latest.evaluationJson() == null ? null : latest.evaluationJson().path("score").isNumber()
         ? latest.evaluationJson().path("score").asDouble() : null;
     String stage = currentStage(task, plan, latest);
+    java.util.Map<Integer, ResultView> resultsByIndex = results.stream()
+        .collect(java.util.stream.Collectors.toMap(ResultView::index, value -> value));
+    List<GenerationResultSlotRecord> slotRecords = task.settlementVersionValue() == 2
+        ? mapper.listResultSlots(task.id()) : List.of();
+    List<SlotView> slots = slotRecords == null ? List.of() : slotRecords.stream()
+        .map(slot -> new SlotView(slot.slotIndex(), slot.label(), slot.role(), apiValue(slot.status()),
+            resultsByIndex.get(slot.slotIndex()), slot.errorCode(), slot.errorMessage())).toList();
+    int successful = task.settlementVersionValue() == 2
+        ? (int) slots.stream().filter(slot -> "succeeded".equals(slot.status())).count() : results.size();
+    int consumed = task.settlementVersionValue() == 2 ? task.consumedCost() : successful * task.unitCost();
     return new TaskView(task.id(), task.sessionId(), apiValue(task.status()), task.mode().name(), task.prompt(),
         refs, task.model(), task.ratio().databaseValue(), task.resolution().databaseValue(), task.width(), task.height(),
         task.imageCount(), task.unitCost(), task.totalCost(), task.errorCode(), task.errorMessage(),
         task.startedAt(), task.completedAt(), task.createdAt(), task.updatedAt(), plan == null ? null : apiValue(plan.status()),
-        stage, latest == null ? 0 : latest.iteration(), score, results);
+        stage, latest == null ? 0 : latest.iteration(), score, results, consumed, successful,
+        Math.max(0, task.imageCount() - successful), plan == null ? null : apiValue(plan.collectionMode()), slots);
+  }
+
+  public SubmitResponse continueMissing(String userId, String taskId, String idempotencyKey) {
+    if (v2 == null) throw bad("TASK_CONTINUE_UNAVAILABLE", "当前服务不支持继续生成");
+    GenerationTaskRecord task = ownedTask(userId, taskId);
+    if (task.settlementVersionValue() != 2 || (task.status() != GenerationTaskStatus.PARTIALLY_SUCCEEDED
+        && task.status() != GenerationTaskStatus.FAILED && task.status() != GenerationTaskStatus.CANCELLED))
+      throw bad("TASK_NOT_CONTINUABLE", "当前任务没有可继续生成的缺失图片");
+    String key = idempotencyKey == null ? "continue-" + task.id() + "-" + UUID.randomUUID() : idempotencyKey.trim();
+    if (!key.matches("[A-Za-z0-9:_-]{8,128}")) throw bad("VALIDATION_ERROR", "幂等键格式无效");
+    GenerationExecutionRecord replay = v2.findExecutionByIdempotency(task.id(), key);
+    if (replay != null) return new SubmitResponse(getSession(userId, task.sessionId()), getTask(userId, task.id()), quota(userId), true);
+    String executionId = UUID.randomUUID().toString();
+    String queuedExecutionId;
+    try {
+      queuedExecutionId = transactions.execute(status -> {
+        // Terminal v2 tasks are the only continuable state. Lock the row before
+        // checking the active execution so two continuation requests cannot both
+        // reserve the same missing slots or race a state transition.
+        GenerationTaskRecord currentTask = v2.lockTask(userId, task.id());
+        GenerationExecutionRecord duplicate = v2.findExecutionByIdempotency(task.id(), key);
+        if (duplicate != null) return null;
+        if (currentTask == null || currentTask.settlementVersionValue() != 2
+            || (currentTask.status() != GenerationTaskStatus.PARTIALLY_SUCCEEDED
+                && currentTask.status() != GenerationTaskStatus.FAILED
+                && currentTask.status() != GenerationTaskStatus.CANCELLED))
+          throw bad("TASK_NOT_CONTINUABLE", "当前任务没有可继续生成的缺失图片");
+        if (v2.findActiveExecution(task.id()) != null) throw bad("TASK_ALREADY_RUNNING", "任务正在生成中");
+        List<Integer> missing = v2.listResultSlots(task.id()).stream()
+            .filter(s -> s.status() != null && !"SUCCEEDED".equals(s.status().name()))
+            .map(GenerationResultSlotRecord::slotIndex).toList();
+        if (missing.isEmpty()) return null;
+        int amount = missing.size() * currentTask.unitCost();
+        if (v2.insertExecution(executionId, task.id(), "CONTINUATION", key, json(missing), amount,
+            currentTask.pricingRuleId(), currentTask.pricingRuleVersion()) != 1)
+          throw new IllegalStateException("continuation execution was not inserted");
+        if (v2.resetMissingSlots(task.id(), executionId) != missing.size())
+          throw bad("TASK_NOT_CONTINUABLE", "缺失图片状态已变化");
+        if (!quota.reserve(userId, task.id(), amount, "reserve:" + executionId, properties.quota().initialTotal(),
+            currentTask.pricingRuleId(), currentTask.pricingRuleVersion(), executionId)) throw bad("QUOTA_INSUFFICIENT", "额度不足");
+        if (v2.queueTaskForContinuation(task.id()) != 1) throw bad("TASK_NOT_CONTINUABLE", "任务状态已变化");
+        insertEvent(task.id(), "task.execution.queued", GenerationTaskStatus.QUEUED, null);
+        return executionId;
+      });
+    } catch (DuplicateKeyException duplicate) {
+      GenerationExecutionRecord raceReplay = v2.findExecutionByIdempotency(task.id(), key);
+      if (raceReplay != null) return new SubmitResponse(getSession(userId, task.sessionId()), getTask(userId, task.id()), quota(userId), true);
+      throw bad("TASK_ALREADY_RUNNING", "任务正在生成中");
+    }
+    if (queuedExecutionId == null) return new SubmitResponse(getSession(userId, task.sessionId()), getTask(userId, task.id()), quota(userId), true);
+    queuePublisher.publishExecution(task.id(), queuedExecutionId, "execution:" + queuedExecutionId);
+    return new SubmitResponse(getSession(userId, task.sessionId()), getTask(userId, task.id()), quota(userId), false);
+  }
+
+  private void cancelV2(String userId, String taskId) {
+    // All v2 mutations lock task -> execution -> slot -> quota. Re-read the
+    // task under the lock because the request-level snapshot may be stale.
+    GenerationTaskRecord task = v2.lockTask(userId, taskId);
+    if (task == null || task.settlementVersionValue() != 2
+        || (task.status() != GenerationTaskStatus.QUEUED && task.status() != GenerationTaskStatus.GENERATING))
+      throw bad("TASK_NOT_CANCELLABLE", "当前任务不能取消");
+    GenerationExecutionRecord execution = v2.findActiveExecution(task.id());
+    if (execution != null) {
+      execution = v2.lockExecution(execution.id());
+      if (execution == null || (execution.status() != com.dreamspace.common.persistence.database.DatabaseEnums.GenerationExecutionStatus.QUEUED
+          && execution.status() != com.dreamspace.common.persistence.database.DatabaseEnums.GenerationExecutionStatus.GENERATING)) {
+        execution = null;
+      }
+    }
+    if (execution != null) {
+      // Mark slots cancelled while holding task and execution locks before
+      // taking the account lock. Late provider responses then fail the same
+      // execution/slot ownership check and cannot consume quota.
+      v2.cancelMissingSlots(task.id());
+      int release = Math.max(0, execution.reservedAmount() - execution.consumedAmount() - execution.releasedAmount());
+      if (release > 0 && !quota.settle(userId, task.id(), release, "RELEASE", "release:" + execution.id(), execution.id(), null)) throw bad("QUOTA_SETTLEMENT_FAILED", "额度结算失败");
+      if (v2.finishExecution(execution.id(), release, "CANCELLED", "TASK_CANCELLED") != 1) throw bad("TASK_NOT_CANCELLABLE", "当前任务不能取消");
+      v2.insertTaskEvent(task.id(), "task.execution.released", "GENERATING",
+          json(java.util.Map.of("executionId", execution.id(), "releasedCost", release)));
+    }
+    if (execution == null) v2.cancelMissingSlots(task.id());
+    if (v2.cancelTaskV2(userId, task.id()) != 1) throw bad("TASK_NOT_CANCELLABLE", "当前任务不能取消");
+    insertEvent(task.id(), "task.cancelled", GenerationTaskStatus.CANCELLED, "TASK_CANCELLED");
   }
 
   private static String currentStage(GenerationTaskRecord task, GenerationPlanRecord plan, GenerationIterationRecord latest) {
@@ -479,10 +653,12 @@ public class GenerationService {
     try { return objectMapper.writeValueAsString(value); } catch (IOException e) { throw new IllegalStateException(e); }
   }
 
-  private String titleFor(String prompt) {
-    String title = prompt == null ? "新的创作" : prompt.trim();
+  static String titleFor(String prompt) {
+    String title = prompt == null ? "新的创作" : prompt.trim().replaceAll("\\s+", " ");
     if (title.isEmpty()) title = "新的创作";
-    return title.length() > 24 ? title.substring(0, 24) : title;
+    return title.codePointCount(0, title.length()) > 20
+        ? title.substring(0, title.offsetByCodePoints(0, 20))
+        : title;
   }
 
   private static boolean terminal(GenerationTaskStatus status) {

@@ -4,7 +4,6 @@ import com.dreamspace.common.persistence.queue.GenerationJob;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Autowired;
 import com.dreamspace.worker.observability.WorkerMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,11 +18,18 @@ public class GenerationProcessor {
   private final GenerationOutputPipeline output;
   private final ContentModerator moderator;
   private final WorkerMetrics metrics;
+  private final GenerationV2SlotProcessor v2Slots;
 
-  @Autowired
   public GenerationProcessor(GenerationWorkerStore store, ImageGenerationModel imageModel,
       GenerationHarness harness, LoopEngine loop, GenerationOutputPipeline output, ContentModerator moderator,
       WorkerMetrics metrics) {
+    this(store, imageModel, harness, loop, output, moderator, metrics, null);
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired
+  public GenerationProcessor(GenerationWorkerStore store, ImageGenerationModel imageModel,
+      GenerationHarness harness, LoopEngine loop, GenerationOutputPipeline output, ContentModerator moderator,
+      WorkerMetrics metrics, @org.springframework.beans.factory.annotation.Autowired(required = false) GenerationV2SlotProcessor v2Slots) {
     this.store = store;
     this.imageModel = imageModel;
     this.harness = harness;
@@ -31,9 +37,17 @@ public class GenerationProcessor {
     this.output = output;
     this.moderator = moderator;
     this.metrics = metrics;
+    this.v2Slots = v2Slots;
   }
 
   public Outcome process(GenerationJob job, GenerationAttempt attempt) {
+    if (isV2Execution(job)) {
+      if (v2Slots == null) throw new IllegalStateException("v2 generation processor is unavailable");
+      if (job.targetId() == null || job.targetId().equals(job.taskId())) {
+        throw new GenerationProviderException("QUEUE_MESSAGE_INVALID", "v2 execution target is invalid", false);
+      }
+      return v2Slots.process(job.targetId(), attempt);
+    }
     WorkerTaskSnapshot task;
     try {
       task = store.start(job.taskId(), attempt).orElse(null);
@@ -151,8 +165,33 @@ public class GenerationProcessor {
   }
 
   public Outcome rejectInvalidMessage(GenerationJob job, GenerationAttempt attempt) {
+    if (isV2Execution(job)) {
+      return rejectV2Execution(job, "QUEUE_MESSAGE_INVALID", "生成任务消息格式无效，未生成图片额度已返还");
+    }
     return failed(job.taskId(), "QUEUE_MESSAGE_INVALID", "生成任务消息格式无效，额度已返还", attempt,
         Map.of("schemaVersion", job.schemaVersion(), "attemptNumber", attempt.number()));
+  }
+
+  public Outcome rejectExhaustedMessage(GenerationJob job, GenerationAttempt attempt) {
+    if (isV2Execution(job)) {
+      return rejectV2Execution(job, "QUEUE_ATTEMPTS_EXHAUSTED", "该图片多次生成失败，后续图片已停止");
+    }
+    return failed(job.taskId(), "QUEUE_ATTEMPTS_EXHAUSTED", "图片生成多次失败，额度已返还", attempt,
+        Map.of("schemaVersion", job.schemaVersion(), "attemptNumber", attempt.number()));
+  }
+
+  private Outcome rejectV2Execution(GenerationJob job, String code, String message) {
+    if (v2Slots == null) throw new IllegalStateException("v2 generation processor is unavailable");
+    if (job.targetId() == null || job.targetId().equals(job.taskId())) {
+      log.atError().addKeyValue("taskId", job.taskId()).addKeyValue("errorCode", code)
+          .log("v2 execution message has no usable execution target");
+      return new Outcome(job.taskId(), Status.IGNORED);
+    }
+    return v2Slots.rejectExecution(job.targetId(), code, message);
+  }
+
+  private static boolean isV2Execution(GenerationJob job) {
+    return job != null && job.schemaVersion() == 2 && "EXECUTION".equals(job.kind());
   }
 
   private Outcome failed(String taskId, String code, String message, GenerationAttempt attempt,

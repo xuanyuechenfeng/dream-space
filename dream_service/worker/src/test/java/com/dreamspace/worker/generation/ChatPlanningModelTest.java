@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.dreamspace.common.persistence.config.DreamSpaceProperties;
+import com.dreamspace.common.persistence.database.DatabaseEnums.CollectionMode;
 import com.dreamspace.common.persistence.database.DatabaseEnums.GenerationInputMode;
 import com.dreamspace.common.persistence.database.DatabaseEnums.GenerationRatio;
 import com.dreamspace.common.persistence.database.DatabaseEnums.GenerationResolution;
@@ -141,6 +142,155 @@ class ChatPlanningModelTest {
     assertThat(result.modelInput()).containsEntry("resolution", "2K");
     assertThat(result.modelInput()).containsEntry("width", 1024);
     assertThat(result.modelInput()).containsEntry("height", 1024);
+  }
+
+  @Test
+  void acceptsPromptWithOnlyRequiredFieldAndIgnoresUnusableOptionalFields() {
+    when(model.call(any(Prompt.class))).thenReturn(response("""
+        {"positivePrompt":"prompt","negativePrompt":[],"modelInput":"invalid","textPolicy":{},"promptVersion":2,"promptRelation":"CUSTOM","alignmentScore":"high","expansionReason":[],"providerExtension":{"trace":"ignored"}}
+        """));
+
+    PromptPackage result = planning.prompt(task(), requirement(),
+        new StructurePlan(new StructureCanvas("1:1", "structured", "2K", 1024, 1024),
+            JsonNodeFactory.instance.arrayNode(), List.of(), List.of(), List.of(), JsonNodeFactory.instance.objectNode(), "balanced"),
+        new VisualSpec("editorial", Map.of(), Map.of(), Map.of(), "high", JsonNodeFactory.instance.arrayNode()), context());
+
+    assertThat(result.positivePrompt()).isEqualTo("prompt");
+    assertThat(result.promptRelation()).isEqualTo(PromptPackage.PromptRelation.ALIGNED);
+    assertThat(result.alignmentScore()).isEqualTo(1.0);
+    assertThat(result.negativePrompt()).isEmpty();
+    assertThat(result.modelInput()).containsOnlyKeys("aspectRatio", "resolution", "width", "height");
+  }
+
+  @Test
+  void rejectsPromptWhenRequiredPositivePromptIsBlank() {
+    when(model.call(any(Prompt.class))).thenReturn(response("""
+        {"positivePrompt":" ","providerExtension":true}
+        """));
+
+    assertThatThrownBy(() -> planning.prompt(task(), requirement(),
+        new StructurePlan(new StructureCanvas("1:1", "structured", "2K", 1024, 1024),
+            JsonNodeFactory.instance.arrayNode(), List.of(), List.of(), List.of(), JsonNodeFactory.instance.objectNode(), "balanced"),
+        new VisualSpec("editorial", Map.of(), Map.of(), Map.of(), "high", JsonNodeFactory.instance.arrayNode()), context()))
+        .isInstanceOf(GenerationProviderException.class)
+        .hasMessageContaining("planning model output is invalid");
+  }
+
+  @Test
+  void deserializesCollectionPlanWithIndependentNestedPrompts() {
+    when(model.call(any(Prompt.class))).thenReturn(response("""
+        {
+          "schemaVersion":"collection-v2", "mode":"DIMENSIONAL", "shared":{"subject":"同一湖畔"},
+          "slots":[
+            {"index":0,"label":"春","role":"SEASON","intent":"春季状态","contentScope":["春季"],"variationConstraints":["新绿"],"prompt":{"positivePrompt":"同一湖畔的春季新绿","negativePrompt":"","modelInput":{"season":"spring"},"textPolicy":"none","promptVersion":"collection-v2","promptRelation":"EXPANDED","alignmentScore":0.95,"expansionReason":"补充季节视觉"},"acceptance":{"seasonVisible":true}},
+            {"index":1,"label":"夏","role":"SEASON","intent":"夏季状态","contentScope":["夏季"],"variationConstraints":["浓绿"],"prompt":{"positivePrompt":"同一湖畔的夏季浓绿","negativePrompt":"","modelInput":{"season":"summer"},"textPolicy":"none","promptVersion":"collection-v2","promptRelation":"EXPANDED","alignmentScore":0.95,"expansionReason":"补充季节视觉"},"acceptance":{"seasonVisible":true}}
+          ],
+          "confidence":0.94, "unknowns":[], "needsClarification":false, "clarificationReason":""
+        }
+        """));
+
+    CollectionPlanProposal result = planning.collection(task(), 2, "2", context());
+
+    assertThat(result.mode()).isEqualTo(CollectionMode.DIMENSIONAL);
+    assertThat(result.slots()).extracting(slot -> slot.label()).containsExactly("春", "夏");
+    assertThat(result.slots().get(0).prompt().path("modelInput").path("season").asText())
+        .isEqualTo("spring");
+  }
+
+  @Test
+  void normalizesMissingAndNullCollectionPromptModelInput() {
+    when(model.call(any(Prompt.class))).thenReturn(response("""
+        {
+          "schemaVersion":"collection-v2", "mode":"VARIATIONS", "shared":{},
+          "slots":[
+            {"index":0,"label":"明亮版","role":"VARIATION","intent":"明亮产品图","contentScope":["产品"],"variationConstraints":["明亮"],"prompt":{"positivePrompt":"明亮产品图","negativePrompt":"","textPolicy":"none","promptVersion":"collection-v2","promptRelation":"ALIGNED","alignmentScore":1.0},"acceptance":{}},
+            {"index":1,"label":"深色版","role":"VARIATION","intent":"深色产品图","contentScope":["产品"],"variationConstraints":["深色"],"prompt":{"positivePrompt":"深色产品图","negativePrompt":"","modelInput":null,"textPolicy":"none","promptVersion":"collection-v2","promptRelation":"ALIGNED","alignmentScore":1.0},"acceptance":{}}
+          ],
+          "confidence":0.94, "unknowns":[], "needsClarification":false, "clarificationReason":""
+        }
+        """));
+
+    CollectionPlanProposal result = planning.collection(task(), 2, "2", context());
+
+    assertThat(result.slots()).allSatisfy(slot ->
+        assertThat(slot.prompt().path("modelInput").isObject()).isTrue());
+  }
+
+  @Test
+  void normalizesCaseInsensitiveCollectionPromptRelation() {
+    when(model.call(any(Prompt.class))).thenReturn(response("""
+        {
+          "schemaVersion":"collection-v2", "mode":"VARIATIONS", "shared":{},
+          "slots":[
+            {"index":0,"label":"产品图","role":"VARIATION","intent":"产品图","contentScope":["产品"],"variationConstraints":[],"prompt":{"positivePrompt":"产品图","negativePrompt":"","modelInput":{},"textPolicy":"none","promptVersion":"collection-v2","promptRelation":"expanded","alignmentScore":0.95},"acceptance":{}}
+          ],
+          "confidence":0.94, "unknowns":[], "needsClarification":false, "clarificationReason":""
+        }
+        """));
+
+    CollectionPlanProposal result = planning.collection(task(), 1, "1", context());
+
+    assertThat(result.slots().getFirst().prompt().path("promptRelation").asText())
+        .isEqualTo("EXPANDED");
+  }
+
+  @Test
+  void ignoresUnusableOptionalCollectionPromptFields() {
+    when(model.call(any(Prompt.class))).thenReturn(response("""
+        {
+          "schemaVersion":"collection-v2", "mode":"VARIATIONS", "shared":{},
+          "slots":[
+            {"index":0,"label":"产品图","role":"VARIATION","intent":"产品图","contentScope":"invalid","variationConstraints":true,"prompt":{"positivePrompt":"产品图","negativePrompt":[],"modelInput":"invalid","textPolicy":{},"promptVersion":2,"promptRelation":"CUSTOM","alignmentScore":"high","providerExtension":{"trace":"kept out"}},"acceptance":"invalid","slotExtension":true}
+          ],
+          "confidence":0.94, "unknowns":[], "needsClarification":false, "clarificationReason":""
+        }
+        """));
+
+    CollectionPlanProposal result = planning.collection(task(), 1, "1", context());
+
+    var slot = result.slots().getFirst();
+    assertThat(slot.contentScope()).containsExactly("产品图");
+    assertThat(slot.variationConstraints()).isEmpty();
+    assertThat(slot.acceptance().isObject()).isTrue();
+    assertThat(slot.prompt().path("modelInput").isObject()).isTrue();
+    assertThat(slot.prompt().path("promptRelation").asText()).isEqualTo("ALIGNED");
+    assertThat(slot.prompt().path("alignmentScore").asDouble()).isEqualTo(1.0);
+    assertThat(slot.prompt().path("negativePrompt").asText()).isEmpty();
+  }
+
+  @Test
+  void normalizesSequentialOneBasedCollectionSlotIndexes() {
+    when(model.call(any(Prompt.class))).thenReturn(response("""
+        {
+          "schemaVersion":"collection-v2", "mode":"SEQUENCE", "shared":{"imageAssignments":[]},
+          "slots":[
+            {"index":1,"label":"总览","role":"SUMMARY","intent":"总览","contentScope":["总览"],"variationConstraints":[],"prompt":{"positivePrompt":"总览图","negativePrompt":"","modelInput":{},"textPolicy":"exact","promptVersion":"collection-v2","promptRelation":"ALIGNED","alignmentScore":1.0},"acceptance":{}},
+            {"index":2,"label":"步骤一","role":"STEP","intent":"步骤一","contentScope":["步骤一"],"variationConstraints":[],"prompt":{"positivePrompt":"步骤一","negativePrompt":"","modelInput":{},"textPolicy":"exact","promptVersion":"collection-v2","promptRelation":"ALIGNED","alignmentScore":1.0},"acceptance":{}},
+            {"index":3,"label":"步骤二","role":"STEP","intent":"步骤二","contentScope":["步骤二"],"variationConstraints":[],"prompt":{"positivePrompt":"步骤二","negativePrompt":"","modelInput":{},"textPolicy":"exact","promptVersion":"collection-v2","promptRelation":"ALIGNED","alignmentScore":1.0},"acceptance":{}},
+            {"index":4,"label":"步骤三","role":"STEP","intent":"步骤三","contentScope":["步骤三"],"variationConstraints":[],"prompt":{"positivePrompt":"步骤三","negativePrompt":"","modelInput":{},"textPolicy":"exact","promptVersion":"collection-v2","promptRelation":"ALIGNED","alignmentScore":1.0},"acceptance":{}}
+          ],
+          "confidence":0.94, "unknowns":[], "needsClarification":false, "clarificationReason":""
+        }
+        """));
+
+    CollectionPlanProposal result = planning.collection(task(), 4, "4", context());
+
+    assertThat(result.slots()).extracting(slot -> slot.index()).containsExactly(0, 1, 2, 3);
+  }
+
+  @Test
+  void rejectsCollectionSlotWithMissingNestedContractField() {
+    when(model.call(any(Prompt.class))).thenReturn(response("""
+        {
+          "schemaVersion":"collection-v2", "mode":"VARIATIONS", "shared":{},
+          "slots":[{"index":0,"role":"VARIATION","intent":"产品图","contentScope":["产品"],"variationConstraints":[],"prompt":{"positivePrompt":"产品图","negativePrompt":"","modelInput":{},"textPolicy":"none","promptVersion":"collection-v2","promptRelation":"ALIGNED","alignmentScore":1.0},"acceptance":{}}],
+          "confidence":0.94, "unknowns":[], "needsClarification":false, "clarificationReason":""
+        }
+        """));
+
+    assertThatThrownBy(() -> planning.collection(task(), 1, "1", context()))
+        .isInstanceOf(GenerationProviderException.class)
+        .hasMessage("planning model output is invalid");
   }
 
   @Test

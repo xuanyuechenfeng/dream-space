@@ -21,17 +21,19 @@ public interface GenerationMapper {
   int renameSession(@Param("userId") String userId, @Param("id") String id, @Param("title") String title);
   @Update("UPDATE \"GenerationSession\" SET \"draft\" = CAST(#{draft} AS JSONB), \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = #{id} AND \"userId\" = #{userId}")
   int updateDraft(@Param("userId") String userId, @Param("id") String id, @Param("draft") String draft);
-  @Delete("DELETE FROM \"GenerationSession\" WHERE \"id\" = #{id} AND \"userId\" = #{userId} AND NOT EXISTS (SELECT 1 FROM \"GenerationTask\" WHERE \"sessionId\" = #{id} AND \"status\" IN ('QUEUED','GENERATING'))")
+  @Delete("WITH deleted_preflights AS (DELETE FROM \"GenerationPreflight\" WHERE \"userId\" = #{userId} AND \"sessionId\" = #{id} AND \"status\" NOT IN ('QUEUED','PLANNING','READY') RETURNING \"id\") DELETE FROM \"GenerationSession\" WHERE \"id\" = #{id} AND \"userId\" = #{userId} AND NOT EXISTS (SELECT 1 FROM \"GenerationTask\" WHERE \"sessionId\" = #{id} AND \"status\" IN ('QUEUED','GENERATING')) AND NOT EXISTS (SELECT 1 FROM \"GenerationPreflight\" WHERE \"sessionId\" = #{id} AND \"status\" IN ('QUEUED','PLANNING','READY'))")
   int deleteSession(@Param("userId") String userId, @Param("id") String id);
   @Select("SELECT COUNT(*) FROM \"GenerationTask\" WHERE \"sessionId\" = #{id} AND \"status\" IN ('QUEUED','GENERATING')")
   int countActiveTasks(String id);
+  @Select("SELECT COUNT(*) FROM \"GenerationPreflight\" WHERE \"sessionId\" = #{id} AND \"status\" IN ('QUEUED','PLANNING','READY')")
+  int countActivePreflights(String id);
 
   @Select("SELECT * FROM \"GenerationTask\" WHERE \"id\" = #{id} LIMIT 1") GenerationTaskRecord findTask(String id);
   @Select("SELECT * FROM \"GenerationTask\" WHERE \"userId\" = #{userId} AND \"idempotencyKey\" = #{key} LIMIT 1")
   GenerationTaskRecord findByIdempotencyKey(@Param("userId") String userId, @Param("key") String key);
   @Select("SELECT * FROM \"GenerationTask\" WHERE \"sessionId\" = #{sessionId} ORDER BY \"createdAt\" DESC")
   List<GenerationTaskRecord> listTasks(String sessionId);
-  @Select("SELECT * FROM \"GenerationTask\" WHERE \"status\" = 'QUEUED' AND \"queueJobId\" IS NULL ORDER BY \"createdAt\" ASC LIMIT #{limit}")
+  @Select("SELECT * FROM \"GenerationTask\" WHERE \"status\" = 'QUEUED' AND \"queueJobId\" IS NULL AND \"settlementVersion\" = 1 ORDER BY \"createdAt\" ASC LIMIT #{limit}")
   List<GenerationTaskRecord> listPendingQueuePublish(int limit);
   @Insert("INSERT INTO \"GenerationTask\" (\"id\",\"sessionId\",\"userId\",\"status\",\"prompt\",\"model\",\"ratio\",\"resolution\",\"width\",\"height\",\"imageCount\",\"imageIds\",\"unitCost\",\"totalCost\",\"idempotencyKey\",\"createdAt\",\"updatedAt\") VALUES (#{id},#{sessionId},#{userId},'QUEUED',#{prompt},#{model},#{ratio}::\"GenerationRatio\",#{resolution}::\"GenerationResolution\",#{width},#{height},1,CAST(#{imageIds} AS JSONB),#{unitCost},#{totalCost},#{idempotencyKey},CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)")
   int insertTask(@Param("id") String id, @Param("sessionId") String sessionId, @Param("userId") String userId,
@@ -39,6 +41,12 @@ public interface GenerationMapper {
       @Param("resolution") String resolution, @Param("width") Integer width, @Param("height") Integer height,
       @Param("imageIds") String imageIds, @Param("unitCost") int unitCost,
       @Param("totalCost") int totalCost, @Param("idempotencyKey") String idempotencyKey);
+  @Insert("INSERT INTO \"GenerationTask\" (\"id\",\"sessionId\",\"userId\",\"status\",\"prompt\",\"model\",\"ratio\",\"resolution\",\"width\",\"height\",\"imageCount\",\"imageIds\",\"unitCost\",\"totalCost\",\"idempotencyKey\",\"settlementVersion\",\"preflightId\",\"consumedCost\",\"createdAt\",\"updatedAt\") VALUES (#{id},#{sessionId},#{userId},'QUEUED',#{prompt},#{model},#{ratio}::\"GenerationRatio\",#{resolution}::\"GenerationResolution\",#{width},#{height},#{imageCount},CAST(#{imageIds} AS JSONB),#{unitCost},#{totalCost},#{idempotencyKey},2,#{preflightId},0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)")
+  int insertTaskV2(@Param("id") String id, @Param("sessionId") String sessionId, @Param("userId") String userId,
+      @Param("prompt") String prompt, @Param("model") String model, @Param("ratio") String ratio,
+      @Param("resolution") String resolution, @Param("width") Integer width, @Param("height") Integer height,
+      @Param("imageCount") int imageCount, @Param("imageIds") String imageIds, @Param("unitCost") int unitCost,
+      @Param("totalCost") int totalCost, @Param("idempotencyKey") String idempotencyKey, @Param("preflightId") String preflightId);
   @Update("UPDATE \"GenerationTask\" SET \"pricingRuleId\"=#{ruleId},\"pricingRuleVersion\"=#{version},\"updatedAt\"=CURRENT_TIMESTAMP WHERE \"id\"=#{taskId}")
   int updatePricingSnapshot(@Param("taskId") String taskId, @Param("ruleId") String ruleId, @Param("version") int version);
   @Update("UPDATE \"GenerationTask\" SET \"ratio\"=#{ratio}::\"GenerationRatio\",\"width\"=#{width},\"height\"=#{height},\"updatedAt\"=CURRENT_TIMESTAMP WHERE \"id\"=#{taskId} AND \"status\"='GENERATING' AND \"ratio\"='smart' AND \"width\" IS NULL AND \"height\" IS NULL")
@@ -51,6 +59,8 @@ public interface GenerationMapper {
   int cancel(@Param("userId") String userId, @Param("taskId") String taskId);
   @Select("SELECT * FROM \"GenerationResult\" WHERE \"taskId\" = #{taskId} ORDER BY \"index\" ASC")
   List<GenerationResultRecord> listResults(String taskId);
+  @Select("SELECT * FROM \"GenerationResultSlot\" WHERE \"taskId\" = #{taskId} ORDER BY \"slotIndex\" ASC")
+  List<GenerationResultSlotRecord> listResultSlots(String taskId);
   @Select("SELECT r.* FROM \"GenerationResult\" r JOIN \"GenerationTask\" t ON t.\"id\" = r.\"taskId\" WHERE r.\"id\" = #{resultId} AND t.\"userId\" = #{userId} LIMIT 1")
   GenerationResultRecord findOwnedResult(@Param("userId") String userId, @Param("resultId") String resultId);
   @Select("SELECT * FROM \"GenerationTaskEvent\" WHERE \"taskId\" = #{taskId} AND \"id\" > #{afterId} ORDER BY \"id\" ASC LIMIT #{limit}")

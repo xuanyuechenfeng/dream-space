@@ -42,7 +42,7 @@ public record DreamSpaceProperties(
     ai = ai == null ? new Ai(new Planning(false, 2),
         new Image(false, null, null, null, null, "/v1/images/generations", Duration.ofSeconds(60), 3),
         new Harness(3, 0.8, false, 7)) : ai;
-    security = security == null ? new Security(false) : security;
+    security = security == null ? new Security(false, null) : security;
   }
 
   public record Redis(String url, String stream, String consumerGroup, Duration reclaimIdle) {
@@ -102,7 +102,7 @@ public record DreamSpaceProperties(
     }
   }
 
-  public record Security(boolean secureCookies) {}
+  public record Security(boolean secureCookies, String preflightTokenSecret) {}
 
   public record Quota(int initialTotal) {}
 

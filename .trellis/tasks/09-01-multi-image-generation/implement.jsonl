@@ -1,0 +1,8 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend guideline entry point for API, Worker, persistence, migration, error, logging, and test changes."}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"The task adds preflight, slot, execution, ledger dimensions, uniqueness constraints, and transactional settlement."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"The task introduces preflight clarification/failure outcomes, stable error codes, retries, and cancellation races."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Preflight and slot observability must exclude prompts, tokens, credentials, provider payloads, and accessible URLs."}
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend guideline entry point for the generation form, Pinia state, typed SSE contracts, and responsive slot UI."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"The submission workflow chains asynchronous preflight and create, then projects slot events through Pinia."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Preflight and task event envelopes require centralized typed decoding across API and UI boundaries."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"This feature spans UI, HTTP, SSE, Redis work items, Worker planning, database state, storage, and quota ledger contracts."}

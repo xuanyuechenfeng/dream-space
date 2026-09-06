@@ -16,13 +16,20 @@ import java.util.Set;
 import java.util.TreeSet;
 
 public final class CompareSchema {
-  private static final String ACTUAL = "dream_space";
   private static final String BASELINE = "codex_schema_baseline_20260826";
 
   public static void main(String[] args) throws Exception {
     Path directory = Paths.get(args[0]);
+    String url = args.length > 1 ? args[1] : "jdbc:postgresql://localhost:5432/dream_space";
+    String user = args.length > 2 ? args[2] : "dream_space";
+    String password = args.length > 3 ? args[3] : "123456";
+    String actual;
     try (Connection c = DriverManager.getConnection(
-        "jdbc:postgresql://localhost:5432/dream_space", "dream_space", "123456")) {
+        url, user, password)) {
+      try (Statement session = c.createStatement(); ResultSet rows = session.executeQuery("SELECT current_schema()")) {
+        rows.next();
+        actual = rows.getString(1);
+      }
       c.setAutoCommit(false);
       try {
         try (Statement statement = c.createStatement()) {
@@ -35,13 +42,13 @@ public final class CompareSchema {
           }
         }
         ensureSchemaScopedConstraints(c);
-        compare(c, "ENUM", enumQuery(), ACTUAL, BASELINE);
-        compare(c, "TABLE", tableQuery(), ACTUAL, BASELINE);
-        compare(c, "COLUMN", columnQuery(), ACTUAL, BASELINE);
-        compare(c, "CONSTRAINT", constraintQuery(), ACTUAL, BASELINE);
-        compare(c, "INDEX", indexQuery(), ACTUAL, BASELINE);
-        compare(c, "SEQUENCE", sequenceQuery(), ACTUAL, BASELINE);
-        compare(c, "TRIGGER", triggerQuery(), ACTUAL, BASELINE);
+        compare(c, "ENUM", enumQuery(), actual, BASELINE);
+        compare(c, "TABLE", tableQuery(), actual, BASELINE);
+        compare(c, "COLUMN", columnQuery(), actual, BASELINE);
+        compare(c, "CONSTRAINT", constraintQuery(), actual, BASELINE);
+        compare(c, "INDEX", indexQuery(), actual, BASELINE);
+        compare(c, "SEQUENCE", sequenceQuery(), actual, BASELINE);
+        compare(c, "TRIGGER", triggerQuery(), actual, BASELINE);
       } finally {
         c.rollback();
       }

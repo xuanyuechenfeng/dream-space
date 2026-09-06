@@ -76,12 +76,37 @@ public class QuotaTransactionService {
     if (accounts.reserve(userId, amount) != 1) return false;
     QuotaAccountRecord account = accounts.lockAccount(userId);
     if (ruleId == null) ledger.insert(UUID.randomUUID().toString(), userId, taskId, "RESERVE", amount, account.available(), idempotencyKey);
-    else ledger.insertGenerationReserve(UUID.randomUUID().toString(), userId, taskId, amount, account.available(), idempotencyKey, ruleId, ruleVersion);
+    else ledger.insertGenerationReserve(UUID.randomUUID().toString(), userId, taskId, amount, account.available(), idempotencyKey, ruleId, ruleVersion, null);
+    return true;
+  }
+
+  /** Reserve credits for a v2 execution and retain the execution boundary on the ledger row. */
+  @Transactional
+  public boolean reserve(String userId, String taskId, int amount, String idempotencyKey, int initialTotal,
+      String ruleId, Integer ruleVersion, String executionId) {
+    requirePositive(amount);
+    accounts.ensureAccount(userId, initialTotal);
+    accounts.lockAccount(userId);
+    if (ledger.countByIdempotencyKey(idempotencyKey) > 0) return true;
+    if (accounts.reserve(userId, amount) != 1) return false;
+    QuotaAccountRecord account = accounts.lockAccount(userId);
+    if (ruleId == null && executionId == null) {
+      ledger.insert(UUID.randomUUID().toString(), userId, taskId, "RESERVE", amount, account.available(), idempotencyKey);
+    } else {
+      ledger.insertGenerationReserve(UUID.randomUUID().toString(), userId, taskId, amount, account.available(), idempotencyKey, ruleId, ruleVersion, executionId);
+    }
     return true;
   }
 
   @Transactional
   public boolean settle(String userId, String taskId, int amount, String type, String idempotencyKey) {
+    return settle(userId, taskId, amount, type, idempotencyKey, null, null);
+  }
+
+  /** Settle a v2 execution/slot while retaining the legacy overload for v1 tasks. */
+  @Transactional
+  public boolean settle(String userId, String taskId, int amount, String type, String idempotencyKey,
+      String executionId, Integer slotIndex) {
     requirePositive(amount);
     if (!"CONSUME".equals(type) && !"RELEASE".equals(type)) throw new IllegalArgumentException("invalid settlement type");
     accounts.ensureAccount(userId, 100);
@@ -90,7 +115,8 @@ public class QuotaTransactionService {
     int changed = "CONSUME".equals(type) ? accounts.consume(userId, amount) : accounts.release(userId, amount);
     if (changed != 1) return false;
     QuotaAccountRecord account = accounts.lockAccount(userId);
-    ledger.insert(UUID.randomUUID().toString(), userId, taskId, type, amount, account.available(), idempotencyKey);
+    if (executionId == null) ledger.insert(UUID.randomUUID().toString(), userId, taskId, type, amount, account.available(), idempotencyKey);
+    else ledger.insertSettlement(UUID.randomUUID().toString(), userId, taskId, type, amount, account.available(), idempotencyKey, executionId, slotIndex);
     return true;
   }
 

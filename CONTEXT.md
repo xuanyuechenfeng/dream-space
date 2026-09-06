@@ -81,3 +81,47 @@ An append-only record of who attempted or completed a management action, on whic
 ## Operations Metric
 
 A time-bucketed business measurement used for operational decisions, such as active users or generation success rate. It is distinct from financial report facts and runtime telemetry.
+
+## Target Image Count
+
+The number of image results a User expects from one Generation Task, from 1 through 4. A manually selected count takes precedence; otherwise an explicit count in the User's prompt is used, with 1 as the default when no count is stated.
+
+## Result Slot
+
+A stable, ordered position for one image result within a Generation Task. A task has one Result Slot for each unit of its Target Image Count, and the slot identity remains stable across continuation attempts.
+
+## Slot Settlement
+
+The final credit outcome for one Result Slot. A successful slot consumes its reserved credits exactly once; credits reserved for slots that do not succeed are released.
+
+## Slot Attempt
+
+A bounded effort to fill one Result Slot, including automatic recovery from transient provider errors and any quality refinement allowed for that slot. It fails only after those recovery opportunities are exhausted.
+
+## Full Regeneration
+
+A User-requested operation that creates a new Generation Task from the prior task's generation inputs and full Target Image Count. The prior task and its results remain unchanged; Full Regeneration is not a continuation attempt.
+
+## Generation Cancellation
+
+A User-requested stop to a Generation Task that preserves successful Result Slots and their Slot Settlements while abandoning unfinished slots. Credits reserved for unfinished slots are released, and those slots may later be continued.
+
+## Image Collection Plan
+
+The frozen, set-level interpretation of a multi-image Generation Task. It defines shared facts and visual constraints plus the ordered Slot Intents for independent alternatives, variations along explicit dimensions, or a structured sequence.
+
+## Slot Intent
+
+The distinct purpose and content scope assigned to one Result Slot by an Image Collection Plan. It preserves the set's shared constraints while defining what that slot alone must communicate.
+
+## Collection Preflight
+
+A short-lived, non-billable planning result produced before a Generation Task is created. It resolves the Image Collection Plan, Target Image Count, slot summaries and estimated cost so the User can correct ambiguity before credits are reserved.
+
+## Plan Token
+
+A single-use reference to a valid Collection Preflight. It binds the frozen plan to the normalized generation inputs and expires if unused, preventing a stale or replayed preflight from creating a task or reserving credits.
+
+## Collection Clarification
+
+A pre-task outcome indicating that an Image Collection Plan cannot be formed without missing facts or an arbitrary choice between plausible slot structures. It asks the User to revise the input and never creates a Generation Task or reserves credits.

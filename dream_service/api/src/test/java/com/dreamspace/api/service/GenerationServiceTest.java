@@ -40,6 +40,15 @@ import org.springframework.transaction.support.DefaultTransactionStatus;
 
 class GenerationServiceTest {
   @Test
+  void limitsGeneratedSessionTitlesToTwentyCharacters() {
+    assertThat(GenerationService.titleFor("12345678901234567890extra"))
+        .isEqualTo("12345678901234567890");
+    assertThat(GenerationService.titleFor("😀".repeat(21)).codePointCount(0,
+        GenerationService.titleFor("😀".repeat(21)).length())).isEqualTo(20);
+    assertThat(GenerationService.titleFor("  hello\nworld  ")).isEqualTo("hello world");
+  }
+
+  @Test
   void returnsDraftAsApiDtoInsteadOfJsonNodeMetadata() {
     ObjectMapper json = new ObjectMapper();
     GenerationMapper mapper = mock(GenerationMapper.class);
@@ -147,6 +156,36 @@ class GenerationServiceTest {
     GenerationService service = service(mock(GenerationMapper.class), mock(QuotaTransactionService.class),
         mock(GenerationQueuePublisher.class), new TestTransactionManager(), new ObjectMapper());
     assertThat(service.options().modes()).containsExactly("AUTO");
+  }
+
+  @Test
+  void deletesOwnedSessionWhenNoTaskOrPreflightIsActive() {
+    GenerationMapper mapper = mock(GenerationMapper.class);
+    Instant now = Instant.parse("2026-08-17T00:00:00Z");
+    when(mapper.findSession("user-1", "session-1"))
+        .thenReturn(new GenerationSessionRecord("session-1", "user-1", "Test", new ObjectMapper().createObjectNode(), now, now));
+    when(mapper.deleteSession("user-1", "session-1")).thenReturn(1);
+    GenerationService service = service(mapper, mock(QuotaTransactionService.class),
+        mock(GenerationQueuePublisher.class), new TestTransactionManager(), new ObjectMapper());
+
+    service.deleteSession("user-1", "session-1");
+
+    verify(mapper).deleteSession("user-1", "session-1");
+  }
+
+  @Test
+  void refusesToDeleteSessionWhilePreflightIsActive() {
+    GenerationMapper mapper = mock(GenerationMapper.class);
+    Instant now = Instant.parse("2026-08-17T00:00:00Z");
+    when(mapper.findSession("user-1", "session-1"))
+        .thenReturn(new GenerationSessionRecord("session-1", "user-1", "Test", new ObjectMapper().createObjectNode(), now, now));
+    when(mapper.countActivePreflights("session-1")).thenReturn(1);
+    GenerationService service = service(mapper, mock(QuotaTransactionService.class),
+        mock(GenerationQueuePublisher.class), new TestTransactionManager(), new ObjectMapper());
+
+    assertThatThrownBy(() -> service.deleteSession("user-1", "session-1"))
+        .isInstanceOfSatisfying(ApiException.class, error -> assertThat(error.code()).isEqualTo("SESSION_ACTIVE"));
+    verify(mapper, never()).deleteSession(anyString(), anyString());
   }
 
   @Test

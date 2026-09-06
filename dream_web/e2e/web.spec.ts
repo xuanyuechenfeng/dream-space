@@ -121,18 +121,14 @@ test.describe("web regression matrix", () => {
     await expect(toggle).toBeFocused();
   });
 
-  test("generation recent prompts remain keyboard selectable", async ({ page }) => {
+  test("generation prompt focus does not show recent prompts", async ({ page }) => {
     test.skip(test.info().project.name !== "web-mobile", "Runs only on the mobile project");
     await page.addInitScript(() => localStorage.setItem("dream-space-prompt-history", JSON.stringify(["Keyboard prompt"])));
     await page.goto("/dream_web/generate");
     const prompt = page.getByPlaceholder(/描述画面和素材关系|Describe the image/);
     await prompt.focus();
-    const recent = page.getByRole("button", { name: "Keyboard prompt" });
-    await expect(recent).toBeVisible();
-    await page.keyboard.press("Tab");
-    await expect(recent).toBeFocused();
-    await page.keyboard.press("Enter");
-    await expect(prompt).toHaveValue("Keyboard prompt");
+    await expect(page.locator(".prompt-history")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Keyboard prompt" })).toHaveCount(0);
     await expect(prompt).toBeFocused();
   });
 

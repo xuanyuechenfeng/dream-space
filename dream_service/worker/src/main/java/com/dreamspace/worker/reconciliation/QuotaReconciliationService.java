@@ -2,6 +2,7 @@ package com.dreamspace.worker.reconciliation;
 
 import com.dreamspace.common.persistence.database.DatabaseEnums.GenerationTaskStatus;
 import com.dreamspace.common.persistence.generation.GenerationTaskRecord;
+import com.dreamspace.common.persistence.generation.GenerationExecutionRecord;
 import com.dreamspace.common.persistence.quota.QuotaAccountRecord;
 import com.dreamspace.worker.persistence.reconciliation.QuotaReconciliationMapper;
 import com.dreamspace.common.persistence.reconciliation.QuotaReconciliationRunRecord;
@@ -41,10 +42,17 @@ public class QuotaReconciliationService {
       accounts = mapper.listAccounts();
       for (QuotaAccountRecord account : accounts) {
         List<GenerationTaskRecord> tasks = mapper.listTasks(account.userId());
+        List<GenerationExecutionRecord> executions = mapper.listV2Executions(account.userId());
+        List<QuotaReconciliationMapper.V2SlotSettlement> slotSettlements =
+            mapper.listV2SlotSettlements(account.userId());
         scannedTasks += tasks.size();
-        int activeReserved = tasks.stream().filter(task -> isActive(task.status()))
-            .mapToInt(GenerationTaskRecord::totalCost).sum();
+        int activeReserved = tasks.stream()
+            .filter(task -> task.settlementVersionValue() != 2 && isActive(task.status()))
+            .mapToInt(GenerationTaskRecord::totalCost).sum()
+            + executions.stream().filter(execution -> isActive(execution.status()))
+                .mapToInt(QuotaReconciliationService::remainingReserve).sum();
         for (GenerationTaskRecord task : tasks) {
+          if (task.settlementVersionValue() == 2) continue;
           String expectedType = expectedLedgerType(task.status());
           if (expectedType == null) continue;
           Integer actual = mapper.findLedgerAmount(task.id(), expectedType);
@@ -58,7 +66,51 @@ public class QuotaReconciliationService {
           mapper.finishFinding(candidateId, key, fixed ? "REPAIRED" : "BLOCKED");
           if (fixed) repaired++;
         }
-        DriftCounts drift = recordDrift(candidateId, account);
+        for (GenerationExecutionRecord execution : executions) {
+          int reserve = mapper.sumExecutionLedger(execution.id(), "RESERVE");
+          int consume = mapper.sumExecutionLedger(execution.id(), "CONSUME");
+          int release = mapper.sumExecutionLedger(execution.id(), "RELEASE");
+          boolean terminal = execution.status() == com.dreamspace.common.persistence.database.DatabaseEnums.GenerationExecutionStatus.SUCCEEDED
+              || execution.status() == com.dreamspace.common.persistence.database.DatabaseEnums.GenerationExecutionStatus.FAILED
+              || execution.status() == com.dreamspace.common.persistence.database.DatabaseEnums.GenerationExecutionStatus.CANCELLED;
+          if (reserve != execution.reservedAmount() || consume != execution.consumedAmount()
+              || release != execution.releasedAmount()
+              || execution.reservedAmount() < execution.consumedAmount() + execution.releasedAmount()
+              || (terminal && reserve != consume + release)) {
+            mismatches++;
+            String key = "reconciliation:v2-execution-settlement:" + execution.id();
+            recordFinding(candidateId, account.userId(), execution.taskId(), "SETTLEMENT_AMOUNT_MISMATCH", key,
+                execution.reservedAmount(), reserve, Map.of("executionId", execution.id(), "consumedLedger", consume,
+                    "releasedLedger", release, "executionStatus", execution.status().name()));
+            mapper.finishFinding(candidateId, key, "BLOCKED");
+          }
+        }
+        for (QuotaReconciliationMapper.V2SlotSettlement slot : slotSettlements) {
+          boolean succeeded = "SUCCEEDED".equals(slot.status());
+          int expected = succeeded ? slot.unitCost() : 0;
+          int expectedCount = succeeded ? 1 : 0;
+          if (slot.consumedAmount() == expected && slot.consumeCount() == expectedCount) continue;
+          mismatches++;
+          String key = "reconciliation:v2-slot-settlement:" + slot.taskId() + ":" + slot.slotIndex();
+          recordFinding(candidateId, account.userId(), slot.taskId(), "SETTLEMENT_AMOUNT_MISMATCH", key,
+              expected, slot.consumedAmount(), Map.of("slotIndex", slot.slotIndex(), "slotStatus", slot.status(),
+                  "consumeCount", slot.consumeCount()));
+          mapper.finishFinding(candidateId, key, "BLOCKED");
+        }
+        for (GenerationTaskRecord task : tasks) {
+          if (task.settlementVersionValue() != 2) continue;
+          long succeededSlots = slotSettlements.stream()
+              .filter(slot -> task.id().equals(slot.taskId()) && "SUCCEEDED".equals(slot.status())).count();
+          int expectedConsumed = Math.toIntExact(succeededSlots * task.unitCost());
+          if (task.consumedCost() == expectedConsumed) continue;
+          mismatches++;
+          String key = "reconciliation:v2-task-consumed:" + task.id();
+          recordFinding(candidateId, account.userId(), task.id(), "SETTLEMENT_AMOUNT_MISMATCH", key,
+              expectedConsumed, task.consumedCost(), Map.of("succeededSlotCount", succeededSlots,
+                  "unitCost", task.unitCost()));
+          mapper.finishFinding(candidateId, key, "BLOCKED");
+        }
+        DriftCounts drift = recordDrift(candidateId, account, activeReserved);
         mismatches += drift.mismatches();
       }
       mapper.completeRun(candidateId, accounts.size(), scannedTasks, mismatches, repaired);
@@ -90,13 +142,10 @@ public class QuotaReconciliationService {
     return false;
   }
 
-  private DriftCounts recordDrift(String runId, QuotaAccountRecord account) {
+  private DriftCounts recordDrift(String runId, QuotaAccountRecord account, int expectedReserved) {
     int grants = mapper.sumLedger(account.userId(), "GRANT");
-    int reserves = mapper.sumLedger(account.userId(), "RESERVE");
     int consumes = mapper.sumLedger(account.userId(), "CONSUME");
-    int releases = mapper.sumLedger(account.userId(), "RELEASE");
-    int expectedReserved = reserves - consumes - releases;
-    int expectedAvailable = grants - reserves + releases;
+    int expectedAvailable = grants - consumes - expectedReserved;
     int count = 0;
     count += blockDrift(runId, account.userId(), "TOTAL_DRIFT", grants, account.total());
     count += blockDrift(runId, account.userId(), "RESERVED_DRIFT", expectedReserved, account.reserved());
@@ -107,7 +156,8 @@ public class QuotaReconciliationService {
   private int blockDrift(String runId, String userId, String kind, int expected, int actual) {
     if (expected == actual) return 0;
     String key = "reconciliation:" + kind.toLowerCase().replace('_', '-') + ":" + userId;
-    recordFinding(runId, userId, null, kind, key, expected, actual, Map.of("source", "quota_ledger"));
+    recordFinding(runId, userId, null, kind, key, expected, actual,
+        Map.of("source", "business_state_and_quota_ledger"));
     mapper.finishFinding(runId, key, "BLOCKED");
     return 1;
   }
@@ -124,6 +174,15 @@ public class QuotaReconciliationService {
 
   private static boolean isActive(GenerationTaskStatus status) {
     return status == GenerationTaskStatus.QUEUED || status == GenerationTaskStatus.GENERATING;
+  }
+
+  private static boolean isActive(com.dreamspace.common.persistence.database.DatabaseEnums.GenerationExecutionStatus status) {
+    return status == com.dreamspace.common.persistence.database.DatabaseEnums.GenerationExecutionStatus.QUEUED
+        || status == com.dreamspace.common.persistence.database.DatabaseEnums.GenerationExecutionStatus.GENERATING;
+  }
+
+  private static int remainingReserve(GenerationExecutionRecord execution) {
+    return Math.max(0, execution.reservedAmount() - execution.consumedAmount() - execution.releasedAmount());
   }
 
   private static String expectedLedgerType(GenerationTaskStatus status) {

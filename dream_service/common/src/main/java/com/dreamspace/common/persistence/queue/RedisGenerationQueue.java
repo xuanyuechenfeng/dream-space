@@ -44,7 +44,8 @@ public final class RedisGenerationQueue implements GenerationQueue {
   @Override public String publish(GenerationJob job) {
     ensureGroup();
     MapRecord<String, String, String> record = MapRecord.create(properties.redis().stream(), java.util.Map.of(
-        "taskId", job.taskId(), "attemptKey", job.attemptKey(), "attemptNumber", Integer.toString(job.attemptNumber()),
+        "taskId", job.taskId(), "targetId", job.targetId(), "kind", job.kind(), "idempotencyKey", job.idempotencyKey(),
+        "attemptKey", job.attemptKey(), "attemptNumber", Integer.toString(job.attemptNumber()),
         "maxAttempts", Integer.toString(job.maxAttempts()), "schemaVersion", Integer.toString(job.schemaVersion())));
     RecordId id = streams.add(record);
     return id.getValue();
@@ -97,7 +98,10 @@ public final class RedisGenerationQueue implements GenerationQueue {
           record.getValue().getOrDefault("attemptKey", taskId + ":1"),
           parseInt(record.getValue().get("attemptNumber"), -1),
           parseInt(record.getValue().get("maxAttempts"), -1),
-          parseInt(record.getValue().get("schemaVersion"), -1)), deliveryCounts.getOrDefault(id, 1)));
+          parseInt(record.getValue().get("schemaVersion"), -1),
+          record.getValue().getOrDefault("kind", "EXECUTION"),
+          record.getValue().getOrDefault("targetId", taskId),
+          record.getValue().getOrDefault("idempotencyKey", record.getValue().getOrDefault("attemptKey", taskId + ":1"))), deliveryCounts.getOrDefault(id, 1)));
     }
     return result;
   }

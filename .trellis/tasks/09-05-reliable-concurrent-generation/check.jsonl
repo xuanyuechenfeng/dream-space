@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Check lock ordering, idempotency, and migration compatibility."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Check provider parsing/logging and test quality."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Check pending recovery and server-authoritative slot state."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check frontend regression coverage and presentation behavior."}

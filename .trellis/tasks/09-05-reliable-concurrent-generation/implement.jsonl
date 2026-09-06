@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Mapper, locking, migration, and v2 quota boundaries."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Provider JSON validation and logging requirements."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Authoritative task/SSE state and pending submission presentation contract."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Frontend response/state typing expectations."}
+{"file":"docs/design/21-multi-image-generation-and-failure-retry.md","reason":"Existing collection plan, quota, and slot lifecycle design."}

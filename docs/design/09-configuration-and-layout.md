@@ -39,6 +39,7 @@
 | `SFTP_CONNECT_TIMEOUT` / `SFTP_OPERATION_TIMEOUT` | `PT10S` / `PT60S` | sftp | 连接和单次操作超时 |
 | `SFTP_MAX_ATTEMPTS` | `3` | sftp | SFTP 操作最大重试次数 |
 | `COOKIE_SECURE` | `false` | API | 是否为用户和管理员会话 Cookie 设置 `Secure` 属性；HTTPS 部署必须设为 `true` |
+| `PREFLIGHT_TOKEN_SECRET` | 无默认值；本地可放入根目录 `.env.local` | API | 预规划 READY 令牌的稳定 HMAC 密钥；所有 API 实例必须使用同一值，生产环境必须通过 Secret 注入 |
 | `OPENAI_BASE_URL` | `http://localhost:8089` | Worker | OpenAI-compatible `/chat/completions` 地址 |
 | `OPENAI_API_KEY` | 不提交 | Worker | 模型密钥 |
 | `OPENAI_MODEL` | 无默认值，必须由环境变量提供 | Worker | 规划/评估模型名称 |

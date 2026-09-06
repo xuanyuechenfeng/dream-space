@@ -1,4 +1,8 @@
 spring:
+  config:
+    # Load developer-only secrets when running from the repository root. The
+    # file is ignored by Git; production deployments must inject the variable.
+    import: optional:file:./.env.local[.properties],optional:file:../.env.local[.properties]
   application:
     # 服务名称，用于日志、Actuator 信息和运行时服务标识。
     name: dream-space-api
@@ -24,9 +28,9 @@ spring:
     # 常用端口：465（SSL）或 587（STARTTLS）。
     port: ${SPRING_MAIL_PORT:465}
     # SMTP 登录账号，通常与 dream-space.email.from 一致。
-    username: ${SPRING_MAIL_USERNAME:52517@qq.com}
+    username: ${SPRING_MAIL_USERNAME:525317@qq.com}
     # SMTP 授权码/密码，禁止直接写入仓库。
-    password: ${SPRING_MAIL_PASSWORD:jpwbhbf}
+    password: ${SPRING_MAIL_PASSWORD:1}
     properties:
       mail:
         smtp:
@@ -99,6 +103,9 @@ dream-space:
   security:
     # 是否为会话 Cookie 设置 Secure 属性；部署在 HTTPS 反向代理后时应显式设为 true。
     secure-cookies: ${COOKIE_SECURE:false}
+    # 预规划 token 的稳定签名密钥；从 PREFLIGHT_TOKEN_SECRET 或本地 .env.local 注入。
+    # 生产环境必须显式设置，留空时拒绝签发 token。
+    preflight-token-secret: ${PREFLIGHT_TOKEN_SECRET:a9bfa5592dc55fb45384d82478c4ee68}
     # 允许携带 Cookie 跨域访问 API 的 Origin 列表，多个地址使用英文逗号分隔；留空表示不注册 CORS 规则。
     allowed-origins: ${WEB_ORIGIN:}
 

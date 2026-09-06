@@ -23,6 +23,7 @@ public class GenerationQueueConsumer {
   private static final Logger log = LoggerFactory.getLogger(GenerationQueueConsumer.class);
   private final GenerationQueue queue;
   private final GenerationProcessor processor;
+  private final CollectionPreflightProcessor preflightProcessor;
   private final DreamSpaceProperties properties;
   private final WorkerMetrics metrics;
   private final WorkerModelHealthIndicator modelHealth;
@@ -33,17 +34,25 @@ public class GenerationQueueConsumer {
   @Deprecated
   public GenerationQueueConsumer(GenerationQueue queue, GenerationProcessor processor,
       DreamSpaceProperties properties, WorkerMetrics metrics) {
-    this(queue, processor, properties, metrics, null);
+    this(queue, processor, properties, metrics, null, null);
+  }
+
+  /** Compatibility constructor retained for existing worker tests and embedders. */
+  public GenerationQueueConsumer(GenerationQueue queue, GenerationProcessor processor,
+      DreamSpaceProperties properties, WorkerMetrics metrics, WorkerModelHealthIndicator modelHealth) {
+    this(queue, processor, properties, metrics, modelHealth, null);
   }
 
   @org.springframework.beans.factory.annotation.Autowired
   public GenerationQueueConsumer(GenerationQueue queue, GenerationProcessor processor,
-      DreamSpaceProperties properties, WorkerMetrics metrics, WorkerModelHealthIndicator modelHealth) {
+      DreamSpaceProperties properties, WorkerMetrics metrics, WorkerModelHealthIndicator modelHealth,
+      @org.springframework.beans.factory.annotation.Autowired(required = false) CollectionPreflightProcessor preflightProcessor) {
     this.queue = queue;
     this.processor = processor;
     this.properties = properties;
     this.metrics = metrics;
     this.modelHealth = modelHealth;
+    this.preflightProcessor = preflightProcessor;
     this.consumerName = hostName() + "-" + ManagementFactory.getRuntimeMXBean().getName().replace('@', '-');
     log.atInfo().addKeyValue("consumer", consumerName).addKeyValue("stream", properties.redis().stream())
         .addKeyValue("consumerGroup", properties.redis().consumerGroup())
@@ -89,19 +98,31 @@ public class GenerationQueueConsumer {
       GenerationJob job = delivery.job();
       int attemptNumber = Math.max(job.attemptNumber(), delivery.deliveryCount());
       int maxAttempts = Math.max(1, Math.min(job.maxAttempts(), properties.queue().maxAttempts()));
-      GenerationAttempt attempt = new GenerationAttempt(job.taskId() + ":" + attemptNumber,
-          Math.min(attemptNumber, maxAttempts), maxAttempts);
+      GenerationAttempt attempt = new GenerationAttempt(job.targetId() + ":" + attemptNumber,
+          Math.max(1, Math.min(attemptNumber, maxAttempts)), maxAttempts);
       long started = System.nanoTime();
       log.atInfo().addKeyValue("taskId", job.taskId()).addKeyValue("messageId", delivery.messageId())
+          .addKeyValue("kind", job.kind()).addKeyValue("targetId", job.targetId())
           .addKeyValue("attempt", attempt.number()).addKeyValue("maxAttempts", maxAttempts)
           .addKeyValue("deliveryCount", delivery.deliveryCount()).addKeyValue("reclaimed", reclaimed)
           .log("generation delivery processing started");
       try {
-        if (job.schemaVersion() != 1 || job.attemptNumber() < 1 || job.maxAttempts() < 1
-            || attemptNumber > maxAttempts) processor.rejectInvalidMessage(job, attempt);
-        else processor.process(job, attempt);
+        GenerationProcessor.Outcome outcome;
+        if ("PREFLIGHT".equals(job.kind())) {
+          if (preflightProcessor == null || job.schemaVersion() != 2) throw new GenerationProviderException("QUEUE_MESSAGE_INVALID", "preflight work item is not supported", false);
+          boolean processed = preflightProcessor.process(job.targetId(), attempt);
+          outcome = new GenerationProcessor.Outcome(job.targetId(), processed
+              ? GenerationProcessor.Status.SUCCEEDED : GenerationProcessor.Status.IGNORED);
+        } else if (job.schemaVersion() != 1 && job.schemaVersion() != 2 || job.attemptNumber() < 1 || job.maxAttempts() < 1
+            || job.schemaVersion() == 2 && job.targetId().equals(job.taskId())) {
+          outcome = processor.rejectInvalidMessage(job, attempt);
+        } else if (attemptNumber > maxAttempts) {
+          outcome = processor.rejectExhaustedMessage(job, attempt);
+        } else outcome = processor.process(job, attempt);
         queue.acknowledge(delivery.messageId());
         log.atInfo().addKeyValue("taskId", job.taskId()).addKeyValue("messageId", delivery.messageId())
+            .addKeyValue("kind", job.kind()).addKeyValue("targetId", job.targetId())
+            .addKeyValue("outcome", outcome == null ? null : outcome.status())
             .addKeyValue("attempt", attempt.number()).addKeyValue("durationMs", elapsedMillis(started))
             .log("generation delivery acknowledged");
       } catch (GenerationProviderException retryable) {

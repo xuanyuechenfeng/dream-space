@@ -72,6 +72,11 @@ public class SharedPersistenceConfiguration {
       registerEnum(configuration, com.dreamspace.common.persistence.database.DatabaseEnums.InspirationStatus.class);
       registerEnum(configuration, com.dreamspace.common.persistence.database.DatabaseEnums.InspirationSourceType.class);
       registerEnum(configuration, com.dreamspace.common.persistence.database.DatabaseEnums.GenerationTaskStatus.class);
+      registerEnum(configuration, com.dreamspace.common.persistence.database.DatabaseEnums.CollectionMode.class);
+      registerEnum(configuration, com.dreamspace.common.persistence.database.DatabaseEnums.GenerationSlotStatus.class);
+      registerEnum(configuration, com.dreamspace.common.persistence.database.DatabaseEnums.GenerationExecutionKind.class);
+      registerEnum(configuration, com.dreamspace.common.persistence.database.DatabaseEnums.GenerationExecutionStatus.class);
+      registerEnum(configuration, com.dreamspace.common.persistence.database.DatabaseEnums.GenerationPreflightStatus.class);
       registerEnum(configuration, com.dreamspace.common.persistence.database.DatabaseEnums.QuotaLedgerType.class);
       registerEnum(configuration, com.dreamspace.common.persistence.database.DatabaseEnums.AdminRole.class);
       registerEnum(configuration, com.dreamspace.common.persistence.database.DatabaseEnums.ModerationStatus.class);
