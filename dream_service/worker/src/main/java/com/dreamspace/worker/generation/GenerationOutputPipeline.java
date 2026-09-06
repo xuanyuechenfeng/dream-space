@@ -54,10 +54,9 @@ public class GenerationOutputPipeline {
   }
 
   private StoredGenerationResult persistOne(WorkerTaskSnapshot task, ProviderImage image) {
-    OutputDimensions dimensions = OutputDimensions.resolve(task.ratio(), task.resolution(), task.width(), task.height());
     PngImageWriter.EncodedImage encoded;
     try {
-      encoded = png.cover(image.data(), dimensions.width(), dimensions.height(), 480, 40_000_000L);
+      encoded = png.normalize(image.data(), 480, 40_000_000L);
     } catch (ImageProcessingException error) {
       throw new GenerationProviderException(error.code(), "provider image processing failed", false, error);
     }
@@ -79,7 +78,7 @@ public class GenerationOutputPipeline {
     }
     return new StoredGenerationResult(resultId, image.index(),
         "/dream_web/generation/results/" + resultId + "/content", objectKey, thumbnailObjectKey,
-        encoded.checksumSha256(), dimensions.width(), dimensions.height(), PNG_MIME, output.length,
+        encoded.checksumSha256(), encoded.width(), encoded.height(), PNG_MIME, output.length,
         thumbnailWidth, thumbnailHeight, thumbnail.length);
   }
 

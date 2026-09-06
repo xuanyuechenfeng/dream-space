@@ -105,7 +105,7 @@ dream-space:
       # 图片生成服务根地址，不复用规划 ChatModel 地址。
       base-url: https://api.honglin.asia
       # 图片模型独立密钥；禁止与规划密钥在日志或响应中输出。
-      api-key: sk-9efa40398ee975a5af5
+      api-key: sk-9efa40398ee9739559c85e55a5af5
       # 专用图片生成模型名称。
       model: gpt-image-2
       # OpenAI-compatible 图片生成接口路径。

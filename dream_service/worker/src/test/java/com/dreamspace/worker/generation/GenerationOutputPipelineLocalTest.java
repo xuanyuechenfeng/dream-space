@@ -38,7 +38,7 @@ class GenerationOutputPipelineLocalTest {
         GenerationInputMode.AUTO, List.of(), "image-model", GenerationRatio.RATIO_1_1,
         GenerationResolution.K2, 512, 512, 1, 1, 0);
 
-    BufferedImage source = new BufferedImage(64, 64, BufferedImage.TYPE_INT_RGB);
+    BufferedImage source = new BufferedImage(64, 32, BufferedImage.TYPE_INT_RGB);
     ByteArrayOutputStream png = new ByteArrayOutputStream();
     ImageIO.write(source, "png", png);
 
@@ -47,8 +47,18 @@ class GenerationOutputPipelineLocalTest {
 
     assertThat(result.objectKey()).endsWith(".png");
     assertThat(result.thumbnailObjectKey()).endsWith(".png");
+    assertThat(result.width()).isEqualTo(64);
+    assertThat(result.height()).isEqualTo(32);
+    assertThat(result.thumbnailWidth()).isEqualTo(64);
+    assertThat(result.thumbnailHeight()).isEqualTo(32);
     assertThat(Files.readAllBytes(root.resolve(result.objectKey()))).startsWith((byte) 0x89, (byte) 'P', (byte) 'N', (byte) 'G');
     assertThat(Files.readAllBytes(root.resolve(result.thumbnailObjectKey()))).startsWith((byte) 0x89, (byte) 'P', (byte) 'N', (byte) 'G');
+    BufferedImage persisted;
+    try (var input = Files.newInputStream(root.resolve(result.objectKey()))) {
+      persisted = ImageIO.read(input);
+    }
+    assertThat(persisted.getWidth()).isEqualTo(64);
+    assertThat(persisted.getHeight()).isEqualTo(32);
     assertThat(storage.get(result.objectKey())).get()
         .extracting(value -> value.contentType()).isEqualTo("image/png");
     try (var paths = Files.walk(root)) { paths.sorted(Comparator.reverseOrder()).forEach(path -> {

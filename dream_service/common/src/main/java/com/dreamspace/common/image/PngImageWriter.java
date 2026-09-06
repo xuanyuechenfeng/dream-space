@@ -25,11 +25,23 @@ public final class PngImageWriter {
     if (width < 1 || height < 1 || thumbnailMaxWidth < 1) throw new IllegalArgumentException("output dimensions must be positive");
     BufferedImage source = decode(input, maxPixels);
     BufferedImage output = cover(source, width, height);
+    return encode(output, thumbnailMaxWidth);
+  }
+
+  /** Encodes the provider image without imposing the task's requested dimensions. */
+  public EncodedImage normalize(byte[] input, int thumbnailMaxWidth, long maxPixels) {
+    if (thumbnailMaxWidth < 1) throw new IllegalArgumentException("thumbnail dimensions must be positive");
+    return encode(decode(input, maxPixels), thumbnailMaxWidth);
+  }
+
+  private static EncodedImage encode(BufferedImage output, int thumbnailMaxWidth) {
+    int width = output.getWidth();
+    int height = output.getHeight();
     int thumbnailWidth = Math.min(thumbnailMaxWidth, width);
     int thumbnailHeight = Math.max(1, Math.round((float) height * thumbnailWidth / width));
     byte[] encoded = encode(output);
     byte[] thumbnail = encode(resize(output, thumbnailWidth, thumbnailHeight));
-    return new EncodedImage(encoded, thumbnail, thumbnailWidth, thumbnailHeight, sha256(encoded));
+    return new EncodedImage(encoded, width, height, thumbnail, thumbnailWidth, thumbnailHeight, sha256(encoded));
   }
 
   private static BufferedImage decode(byte[] input, long maxPixels) {
@@ -82,5 +94,6 @@ public final class PngImageWriter {
     catch (NoSuchAlgorithmException error) { throw new IllegalStateException(error); }
   }
 
-  public record EncodedImage(byte[] data, byte[] thumbnail, int thumbnailWidth, int thumbnailHeight, String checksumSha256) {}
+  public record EncodedImage(byte[] data, int width, int height, byte[] thumbnail, int thumbnailWidth,
+      int thumbnailHeight, String checksumSha256) {}
 }

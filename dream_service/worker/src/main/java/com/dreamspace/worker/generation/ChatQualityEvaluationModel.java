@@ -24,7 +24,8 @@ public final class ChatQualityEvaluationModel implements QualityEvaluationModel 
   private static final Logger log = LoggerFactory.getLogger(ChatQualityEvaluationModel.class);
   private static final String SYSTEM = "You are the production image quality evaluator. Return one strict JSON object only. "
       + "Evaluate technical validity, required text, structure, visual style, colors, layout and policy. "
-      + "Do not invent facts. accepted is true only when all hard constraints pass. "
+      + "Do not invent facts. accepted is true only when all content and safety constraints pass. "
+      + "The requested ratio, resolution, width and height are guidance supplied to the image model; a provider returning different pixel dimensions is acceptable and must not by itself be reported as a violation or trigger refinement. "
       + "If repairable is true, refinement is required and must contain a non-empty instruction string, targetSections (array of strings), changes (array of strings), preserve (array of strings), and reasonCodes (array of strings). instruction is the complete actionable repair request for the image model; changes must contain the same repair actions in structured form. Preserve user facts, ratio, dimensions and approved content. "
       + "The top-level fields are exactly accepted (boolean), score (number from 0 to 1), violations (array of strings), "
       + "repairable (boolean), evidence (array of strings), evaluatorVersion (string), and optional refinement (object); "
