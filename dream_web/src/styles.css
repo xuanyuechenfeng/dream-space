@@ -1657,6 +1657,8 @@ button:disabled {
 .collection-slot.is-succeeded { border-color: var(--success, #15803d); }
 .collection-slot .result-preview { margin-top: 6px; }
 .collection-slot > .spin { position: absolute; inset: 50% auto auto 50%; transform: translate(-50%, -50%); }
+.collection-slot-placeholder { position: absolute; inset: 46px 8px 8px; display: grid; place-items: center; align-content: center; gap: 8px; min-height: 92px; color: var(--muted); font-size: 12px; text-align: center; }
+.collection-slot-placeholder svg { width: 22px; height: 22px; color: var(--primary); }
 .result-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -2698,6 +2700,14 @@ button:disabled {
 
 .generation-page .collection-slots.is-single .collection-slot-label {
   display: none;
+}
+
+.generation-page .collection-slots.is-single .collection-slot-placeholder {
+  position: relative;
+  inset: auto;
+  min-height: 260px;
+  aspect-ratio: 1;
+  background: #eef3f2;
 }
 
 .generation-page .collection-slots.is-single .result-preview {

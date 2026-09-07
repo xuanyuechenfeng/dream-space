@@ -25,6 +25,7 @@
 19. [管理端运营能力详细设计](./19-admin-operations-capabilities.md)
 20. [未实现功能补齐设计](./20-unimplemented-features-design.md)
 21. [多图片生成与失败续生成设计](./21-multi-image-generation-and-failure-retry.md)
+22. [生成进度展示与长任务同步设计](./22-generation-progress-resilience.md)
 
 ## 实施规则
 

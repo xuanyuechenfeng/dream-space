@@ -15,6 +15,8 @@ public interface GenerationV2Mapper {
   /** Locks the task row so continuation and cancellation make one decision about its active execution. */
   @Select("SELECT * FROM \"GenerationTask\" WHERE \"userId\"=#{userId} AND \"id\"=#{taskId} LIMIT 1 FOR UPDATE")
   GenerationTaskRecord lockTask(@Param("userId") String userId, @Param("taskId") String taskId);
+  @Select("SELECT * FROM \"GenerationTask\" WHERE \"id\"=#{taskId} LIMIT 1")
+  GenerationTaskRecord findTaskForWorker(String taskId);
   @Insert("INSERT INTO \"GenerationTask\" (\"id\",\"sessionId\",\"userId\",\"status\",\"prompt\",\"model\",\"ratio\",\"resolution\",\"width\",\"height\",\"imageCount\",\"imageIds\",\"unitCost\",\"totalCost\",\"idempotencyKey\",\"settlementVersion\",\"preflightId\",\"consumedCost\",\"pricingRuleId\",\"pricingRuleVersion\",\"createdAt\",\"updatedAt\") VALUES (#{id},#{sessionId},#{userId},'QUEUED',#{prompt},#{model},#{ratio}::\"GenerationRatio\",#{resolution}::\"GenerationResolution\",#{width},#{height},#{imageCount},CAST(#{imageIds} AS JSONB),#{unitCost},#{totalCost},#{idempotencyKey},2,#{preflightId},0,#{ruleId},#{ruleVersion},CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)")
   int insertTaskV2(@Param("id") String id, @Param("sessionId") String sessionId, @Param("userId") String userId,
       @Param("prompt") String prompt, @Param("model") String model, @Param("ratio") String ratio,
@@ -71,9 +73,15 @@ public interface GenerationV2Mapper {
   @Select("SELECT * FROM \"GenerationExecution\" WHERE \"id\"=#{id} LIMIT 1") GenerationExecutionRecord findExecution(String id);
   @Select("SELECT * FROM \"GenerationExecution\" WHERE \"id\"=#{id} FOR UPDATE") GenerationExecutionRecord lockExecution(String id);
   @Select("SELECT * FROM \"GenerationExecution\" WHERE \"taskId\"=#{taskId} AND \"status\" IN ('QUEUED','GENERATING') LIMIT 1") GenerationExecutionRecord findActiveExecution(String taskId);
+  @Select("SELECT * FROM \"GenerationExecution\" WHERE \"status\" = 'GENERATING' AND \"updatedAt\" < #{cutoff} ORDER BY \"updatedAt\" LIMIT #{limit}")
+  List<GenerationExecutionRecord> listStaleExecutions(@Param("cutoff") java.time.Instant cutoff, @Param("limit") int limit);
   @Select("SELECT * FROM \"GenerationExecution\" WHERE \"taskId\"=#{taskId} AND \"idempotencyKey\"=#{key} LIMIT 1") GenerationExecutionRecord findExecutionByIdempotency(@Param("taskId") String taskId, @Param("key") String key);
   @Select("SELECT * FROM \"GenerationExecution\" WHERE \"status\"='QUEUED' AND \"queueMessageId\" IS NULL ORDER BY \"createdAt\" LIMIT #{limit}") List<GenerationExecutionRecord> listPendingExecutions(int limit);
   @Select("SELECT * FROM \"GenerationPreflight\" WHERE \"status\"='QUEUED' ORDER BY \"createdAt\" LIMIT #{limit}") List<GenerationPreflightRecord> listPendingPreflights(int limit);
+  @Select("SELECT * FROM \"GenerationPreflight\" WHERE \"status\"='PLANNING' AND \"updatedAt\" < #{cutoff} ORDER BY \"updatedAt\" LIMIT #{limit}")
+  List<GenerationPreflightRecord> listStalePlanningPreflights(@Param("cutoff") java.time.Instant cutoff, @Param("limit") int limit);
+  @Update("UPDATE \"GenerationPreflight\" SET \"status\"='FAILED',\"errorCode\"='GENERATION_PREFLIGHT_TIMEOUT',\"errorDetails\"='生成准备超时，请重试',\"updatedAt\"=CURRENT_TIMESTAMP WHERE \"id\"=#{id} AND \"status\"='PLANNING' AND \"updatedAt\" < #{cutoff}")
+  int timeoutPreflight(@Param("id") String id, @Param("cutoff") java.time.Instant cutoff);
   @Update("UPDATE \"GenerationExecution\" SET \"status\"='GENERATING',\"attempts\"=\"attempts\"+1,\"updatedAt\"=CURRENT_TIMESTAMP WHERE \"id\"=#{id} AND \"status\" IN ('QUEUED','GENERATING') AND \"attempts\" < #{attemptNumber}") int claimExecution(@Param("id") String id, @Param("attemptNumber") int attemptNumber);
   @Update("UPDATE \"GenerationExecution\" SET \"queueMessageId\"=#{messageId},\"updatedAt\"=CURRENT_TIMESTAMP WHERE \"id\"=#{id}") int setExecutionQueueMessage(@Param("id") String id, @Param("messageId") String messageId);
   @Update("UPDATE \"GenerationResultSlot\" SET \"status\"='GENERATING',\"activeExecutionId\"=#{executionId},\"slotAttempt\"=\"slotAttempt\"+1,\"startedAt\"=COALESCE(\"startedAt\",CURRENT_TIMESTAMP),\"updatedAt\"=CURRENT_TIMESTAMP WHERE \"taskId\"=#{taskId} AND \"slotIndex\"=#{index} AND (\"status\"='WAITING' OR (\"status\"='GENERATING' AND \"activeExecutionId\"=#{executionId}))")
@@ -95,6 +103,8 @@ public interface GenerationV2Mapper {
   @Update("UPDATE \"GenerationTask\" SET \"status\"='CANCELLED',\"errorCode\"='TASK_CANCELLED',\"errorMessage\"='任务已取消',\"completedAt\"=CURRENT_TIMESTAMP,\"updatedAt\"=CURRENT_TIMESTAMP WHERE \"id\"=#{taskId} AND \"userId\"=#{userId} AND \"settlementVersion\"=2 AND \"status\" IN ('QUEUED','GENERATING') AND NOT EXISTS (SELECT 1 FROM \"GenerationExecution\" WHERE \"taskId\"=#{taskId} AND \"status\" IN ('QUEUED','GENERATING'))") int cancelTaskV2(@Param("userId") String userId, @Param("taskId") String taskId);
   @Update("UPDATE \"GenerationResultSlot\" SET \"status\"='WAITING',\"activeExecutionId\"=#{executionId},\"errorCode\"=NULL,\"errorMessage\"=NULL,\"startedAt\"=NULL,\"completedAt\"=NULL,\"updatedAt\"=CURRENT_TIMESTAMP WHERE \"taskId\"=#{taskId} AND \"status\"<>'SUCCEEDED'") int resetMissingSlots(@Param("taskId") String taskId, @Param("executionId") String executionId);
   @Update("UPDATE \"GenerationResultSlot\" SET \"status\"='CANCELLED',\"completedAt\"=CURRENT_TIMESTAMP,\"updatedAt\"=CURRENT_TIMESTAMP WHERE \"taskId\"=#{taskId} AND \"status\"<>'SUCCEEDED'") int cancelMissingSlots(String taskId);
+  @Update("UPDATE \"GenerationResultSlot\" SET \"status\"='FAILED',\"activeExecutionId\"=#{executionId},\"errorCode\"='STALE_EXECUTION_RECOVERED',\"errorMessage\"='生成任务超时，已自动结束',\"completedAt\"=CURRENT_TIMESTAMP,\"updatedAt\"=CURRENT_TIMESTAMP WHERE \"taskId\"=#{taskId} AND \"status\"<>'SUCCEEDED'")
+  int failStaleExecutionSlots(@Param("taskId") String taskId, @Param("executionId") String executionId);
   @Insert("INSERT INTO \"GenerationTaskEvent\" (\"taskId\",\"type\",\"status\",\"payload\",\"createdAt\") VALUES (#{taskId},#{type},#{status}::\"GenerationTaskStatus\",CAST(#{payload} AS JSONB),CURRENT_TIMESTAMP)")
   int insertTaskEvent(@Param("taskId") String taskId, @Param("type") String type,
       @Param("status") String status, @Param("payload") String payload);

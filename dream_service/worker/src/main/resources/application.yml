@@ -105,7 +105,7 @@ dream-space:
       # 图片生成服务根地址，不复用规划 ChatModel 地址。
       base-url: https://api.honglin.asia
       # 图片模型独立密钥；禁止与规划密钥在日志或响应中输出。
-      api-key: sk-9efa40398ee9739559c85e55a5af5
+      api-key: sk-9efa40398ee9739559c8af5
       # 专用图片生成模型名称。
       model: gpt-image-2
       # OpenAI-compatible 图片生成接口路径。
@@ -138,6 +138,10 @@ dream-space:
     reconciliation-initial-delay-ms: ${RECONCILIATION_INITIAL_DELAY_MS:60000}
     # 两次额度对账任务之间的固定等待时间，单位为毫秒。
     reconciliation-delay-ms: ${RECONCILIATION_DELAY_MS:3600000}
+    # Maximum time a preflight may remain in PLANNING before it becomes retryable failure.
+    preflight-timeout: ${GENERATION_PREFLIGHT_TIMEOUT:PT120S}
+    preflight-recovery-initial-delay-ms: ${GENERATION_PREFLIGHT_RECOVERY_INITIAL_DELAY_MS:30000}
+    preflight-recovery-delay-ms: ${GENERATION_PREFLIGHT_RECOVERY_DELAY_MS:30000}
     # Maximum number of image slots generated concurrently in one v2 execution.
     # The processor clamps this value to the supported 1-4 slot range.
     slot-concurrency: ${GENERATION_SLOT_CONCURRENCY:4}

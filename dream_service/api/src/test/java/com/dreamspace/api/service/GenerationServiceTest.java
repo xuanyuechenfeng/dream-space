@@ -117,6 +117,9 @@ class GenerationServiceTest {
     ObjectMapper json = new ObjectMapper();
     when(mapper.findByIdempotencyKey("user-1", "request-key-123"))
         .thenReturn(task("original", "request-key-123", 1, GenerationResolution.K2, json));
+    Instant now = Instant.parse("2026-08-17T00:00:00Z");
+    when(mapper.findSession("user-1", "session-1"))
+        .thenReturn(new GenerationSessionRecord("session-1", "user-1", "Test", json.createObjectNode(), now, now));
     GenerationService service = service(mapper, quota, publisher, new TestTransactionManager(), json);
 
     assertThatThrownBy(() -> service.submit("user-1", new GenerationService.TaskRequest("request-key-123", "session-1",
@@ -190,11 +193,26 @@ class GenerationServiceTest {
 
   @Test
   void rejectsExplicitIntentModesAtApiBoundary() {
-    GenerationService service = service(mock(GenerationMapper.class), mock(QuotaTransactionService.class),
+    GenerationMapper mapper = mock(GenerationMapper.class);
+    Instant now = Instant.parse("2026-08-17T00:00:00Z");
+    when(mapper.findSession("user-1", "session-1")).thenReturn(
+        new GenerationSessionRecord("session-1", "user-1", "Test", new ObjectMapper().createObjectNode(), now, now));
+    GenerationService service = service(mapper, mock(QuotaTransactionService.class),
         mock(GenerationQueuePublisher.class), new TestTransactionManager(), new ObjectMapper());
-    assertThatThrownBy(() -> service.submit("user-1", new GenerationService.TaskRequest("request-key-123", null,
+    assertThatThrownBy(() -> service.submit("user-1", new GenerationService.TaskRequest("request-key-123", "session-1",
         "TEXT_TO_IMAGE", "prompt", List.of(), "1:1", "2K", 2048, 2048)))
         .isInstanceOfSatisfying(ApiException.class, error -> assertThat(error.code()).isEqualTo("GENERATION_MODE_INVALID"));
+  }
+
+  @Test
+  void rejectsTaskSubmissionWithoutFormalSession() {
+    GenerationService service = service(mock(GenerationMapper.class), mock(QuotaTransactionService.class),
+        mock(GenerationQueuePublisher.class), new TestTransactionManager(), new ObjectMapper());
+
+    assertThatThrownBy(() -> service.submit("user-1", new GenerationService.TaskRequest("request-key-123", null,
+        "AUTO", "prompt", List.of(), "1:1", "2K", 2048, 2048)))
+        .isInstanceOfSatisfying(ApiException.class,
+            error -> assertThat(error.code()).isEqualTo("GENERATION_SESSION_REQUIRED"));
   }
 
   @Test

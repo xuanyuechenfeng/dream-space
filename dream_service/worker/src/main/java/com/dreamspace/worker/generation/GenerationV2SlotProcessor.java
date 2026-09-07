@@ -207,6 +207,12 @@ public class GenerationV2SlotProcessor {
         ProviderImage candidate = response.images().getFirst();
         image = new ProviderImage(slot.index(), candidate.data(), candidate.mimeType(), candidate.sourceName());
         if (quality == null) break;
+        if (iteration >= 3) {
+          v2.insertTaskEvent(task.id(), "task.slot.quality_skipped", "GENERATING",
+              json(java.util.Map.of("executionId", executionId, "slotIndex", slot.index(),
+                  "attempt", attempt.number(), "iteration", iteration, "reason", "final_quality_iteration")));
+          break;
+        }
         QualityEvaluationModel.EvaluationResult evaluation = quality.evaluate(snapshot,
             new GenerationPlanBundle(null, null, null, prompt), List.of(image), iteration);
         EvaluationReport report = evaluation == null ? null : evaluation.report();

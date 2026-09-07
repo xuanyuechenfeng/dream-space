@@ -3,7 +3,9 @@ package com.dreamspace.worker.reconciliation;
 import com.dreamspace.common.persistence.database.DatabaseEnums.GenerationTaskStatus;
 import com.dreamspace.common.persistence.generation.GenerationTaskRecord;
 import com.dreamspace.common.persistence.generation.GenerationExecutionRecord;
+import com.dreamspace.common.persistence.generation.GenerationV2Mapper;
 import com.dreamspace.common.persistence.quota.QuotaAccountRecord;
+import com.dreamspace.common.persistence.quota.QuotaTransactionService;
 import com.dreamspace.worker.persistence.reconciliation.QuotaReconciliationMapper;
 import com.dreamspace.common.persistence.reconciliation.QuotaReconciliationRunRecord;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -12,21 +14,35 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class QuotaReconciliationService {
+  private static final Logger log = LoggerFactory.getLogger(QuotaReconciliationService.class);
   private final QuotaReconciliationMapper mapper;
   private final ObjectMapper json;
   private final TransactionTemplate transactions;
+  private final GenerationV2Mapper generation;
+  private final QuotaTransactionService quota;
 
   public QuotaReconciliationService(QuotaReconciliationMapper mapper, ObjectMapper json,
       PlatformTransactionManager transactionManager) {
+    this(mapper, json, transactionManager, null, null);
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired
+  public QuotaReconciliationService(QuotaReconciliationMapper mapper, ObjectMapper json,
+      PlatformTransactionManager transactionManager, GenerationV2Mapper generation,
+      QuotaTransactionService quota) {
     this.mapper = mapper;
     this.json = json;
     this.transactions = new TransactionTemplate(transactionManager);
+    this.generation = generation;
+    this.quota = quota;
   }
 
   public Summary run(Instant now, long windowMillis) {
@@ -39,6 +55,9 @@ public class QuotaReconciliationService {
     int repaired = 0;
     List<QuotaAccountRecord> accounts = List.of();
     try {
+      int staleRepairs = generation == null || quota == null ? 0 : recoverStaleExecutions(now, windowMillis);
+      mismatches += staleRepairs;
+      repaired += staleRepairs;
       accounts = mapper.listAccounts();
       for (QuotaAccountRecord account : accounts) {
         List<GenerationTaskRecord> tasks = mapper.listTasks(account.userId());
@@ -174,6 +193,40 @@ public class QuotaReconciliationService {
 
   private static boolean isActive(GenerationTaskStatus status) {
     return status == GenerationTaskStatus.QUEUED || status == GenerationTaskStatus.GENERATING;
+  }
+
+  private int recoverStaleExecutions(Instant now, long windowMillis) {
+    long timeoutMillis = Math.max(3_600_000L, windowMillis);
+    Instant cutoff = now.minusMillis(timeoutMillis);
+    int repaired = 0;
+    for (GenerationExecutionRecord execution : generation.listStaleExecutions(cutoff, 100)) {
+      Boolean fixed = transactions.execute(status -> {
+        var taskSnapshot = generation.findTaskForWorker(execution.taskId());
+        if (taskSnapshot == null) return false;
+        var task = generation.lockTask(taskSnapshot.userId(), taskSnapshot.id());
+        if (task == null) return false;
+        GenerationExecutionRecord locked = generation.lockExecution(execution.id());
+        if (locked == null || !isActive(locked.status()) || locked.updatedAt() == null
+            || !locked.updatedAt().isBefore(cutoff)) return false;
+        generation.failStaleExecutionSlots(task.id(), locked.id());
+        int remaining = remainingReserve(locked);
+        if (remaining > 0 && !quota.settle(task.userId(), task.id(), remaining, "RELEASE",
+            "release:" + locked.id(), locked.id(), null)) return false;
+        if (generation.finishExecution(locked.id(), remaining, "FAILED", "STALE_EXECUTION_RECOVERED") != 1) return false;
+        if (generation.findActiveExecution(task.id()) == null) {
+          boolean hasSuccess = generation.countSucceededSlots(task.id()) > 0;
+          if (generation.setTaskV2Status(task.id(), hasSuccess ? "PARTIALLY_SUCCEEDED" : "FAILED",
+              "STALE_EXECUTION_RECOVERED", "生成任务超时，已自动结束", true) != 1) return false;
+        }
+        return true;
+      });
+      if (Boolean.TRUE.equals(fixed)) {
+        repaired++;
+        log.atWarn().addKeyValue("executionId", execution.id()).addKeyValue("taskId", execution.taskId())
+            .log("recovered stale generation execution");
+      }
+    }
+    return repaired;
   }
 
   private static boolean isActive(com.dreamspace.common.persistence.database.DatabaseEnums.GenerationExecutionStatus status) {

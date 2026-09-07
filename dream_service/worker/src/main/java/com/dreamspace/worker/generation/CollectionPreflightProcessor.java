@@ -70,6 +70,7 @@ public class CollectionPreflightProcessor {
   }
 
   public boolean process(String preflightId, GenerationAttempt attempt) {
+    long started = System.nanoTime();
     GenerationPreflightRecord preflight = mapper.findPreflightForWorker(preflightId);
     if (preflight == null) return false;
     boolean claimed = transaction(() -> mapper.claimPreflight(preflightId) == 1);
@@ -94,9 +95,13 @@ public class CollectionPreflightProcessor {
       if (planning == null) {
         return finish(preflight, "FAILED", null, "PLANNING_MODEL_UNAVAILABLE", "集合规划模型不可用");
       }
+      long modelStarted = System.nanoTime();
       CollectionPlanProposal proposal = planning.collection(snapshot(preflight, prompt, requested), requested,
           mode, new StageContext("preflight:" + preflight.id(), preflight.id(),
               "preflight:" + preflight.id(), "collection_planning"));
+      log.atInfo().addKeyValue("preflightId", preflight.id()).addKeyValue("sessionId", preflight.sessionId())
+          .addKeyValue("attempt", attempt.number()).addKeyValue("durationMs", elapsedMillis(modelStarted))
+          .log("collection preflight planning model completed");
       if (proposal == null) {
         return finish(preflight, "FAILED", null, "GENERATION_COLLECTION_PLAN_INVALID", "集合规划模型未返回结果");
       }
@@ -113,8 +118,17 @@ public class CollectionPreflightProcessor {
       if (!transaction(() -> mapper.updatePreflightOutput(preflight.id(), frozen.ratio(), frozen.width(), frozen.height()) == 1)) {
         return false;
       }
-      return finish(preflight, "READY", frozen.plan(), null, null);
+      boolean finished = finish(preflight, "READY", frozen.plan(), null, null);
+      log.atInfo().addKeyValue("preflightId", preflight.id()).addKeyValue("sessionId", preflight.sessionId())
+          .addKeyValue("status", finished ? "READY" : "UNCHANGED")
+          .addKeyValue("durationMs", elapsedMillis(started)).log("collection preflight processing completed");
+      return finished;
     } catch (RuntimeException error) {
+      log.atWarn().addKeyValue("preflightId", preflight.id())
+          .addKeyValue("attempt", attempt.number()).addKeyValue("maxAttempts", attempt.maxAttempts())
+          .addKeyValue("errorCode", error instanceof GenerationProviderException provider ? provider.code() : "GENERATION_COLLECTION_PLANNING_FAILED")
+          .addKeyValue("retryable", error instanceof GenerationProviderException provider && provider.retryable())
+          .log("collection preflight failed", error);
       if (error instanceof GenerationProviderException provider && provider.retryable()) {
         if (attempt.number() < attempt.maxAttempts()) throw provider;
         return finish(preflight, "FAILED", null, provider.code(), "集合规划服务多次失败，请稍后重试");
@@ -136,7 +150,7 @@ public class CollectionPreflightProcessor {
   }
 
   private boolean finish(GenerationPreflightRecord p, String status, ImageCollectionPlan plan, String code, String details) {
-    return transaction(() -> {
+    boolean finished = transaction(() -> {
       String planJson = plan == null ? null : write(plan);
       Integer count = plan == null ? null : plan.slots().size();
       Integer estimated = plan == null ? null : count * p.unitCost();
@@ -146,6 +160,20 @@ public class CollectionPreflightProcessor {
           write(java.util.Map.of("preflightId", p.id(), "status", status, "targetImageCount", count == null ? 0 : count)));
       return true;
     });
+    if (!finished) {
+      log.atWarn().addKeyValue("preflightId", p.id()).addKeyValue("sessionId", p.sessionId())
+          .addKeyValue("requestedStatus", status).addKeyValue("errorCode", code)
+          .log("collection preflight terminal state was not written");
+    } else {
+      log.atInfo().addKeyValue("preflightId", p.id()).addKeyValue("sessionId", p.sessionId())
+          .addKeyValue("status", status).addKeyValue("errorCode", code)
+          .log("collection preflight terminal state written");
+    }
+    return finished;
+  }
+
+  private static long elapsedMillis(long started) {
+    return java.time.Duration.ofNanos(System.nanoTime() - started).toMillis();
   }
 
   private <T> T transaction(java.util.function.Supplier<T> action) {

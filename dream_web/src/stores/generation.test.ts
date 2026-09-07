@@ -47,18 +47,37 @@ describe("generation submission flow", () => {
     vi.mocked(api.generation.submit).mockResolvedValue({ session: { ...session, draft: baseDraft, tasks: [task] }, task, quota, replayed: false });
   });
 
-  it("submits without creating an empty session first", async () => {
+  it("creates a formal session before submitting", async () => {
     const store = useGenerationStore();
     await store.load();
     store.draft.prompt = "  A tree  ";
     await store.submit();
 
-    expect(api.generation.createSession).not.toHaveBeenCalled();
-    expect(api.generation.submit).toHaveBeenCalledWith(expect.objectContaining({ prompt: "A tree" }));
-    expect(vi.mocked(api.generation.submit).mock.calls[0]?.[0]).not.toHaveProperty("sessionId");
+    expect(api.generation.createSession).toHaveBeenCalledWith(expect.objectContaining({ prompt: "A tree" }));
+    expect(api.generation.submit).toHaveBeenCalledWith(expect.objectContaining({ prompt: "A tree", sessionId: session.id }));
     expect(store.sessions).toEqual([expect.objectContaining({ id: session.id })]);
     expect(store.draft.prompt).toBe("");
     expect(store.draft.imageIds).toEqual([]);
+  });
+
+  it("keeps pending preparation scoped to its formal session", async () => {
+    const first = { ...session, id: "session-a" };
+    const second = { ...session, id: "session-b" };
+    vi.mocked(api.generation.createSession).mockResolvedValueOnce(first);
+    vi.mocked(api.generation.session).mockResolvedValueOnce(second);
+    const pending = deferred<Awaited<ReturnType<typeof api.generation.submit>>>();
+    vi.mocked(api.generation.submit).mockReturnValueOnce(pending.promise);
+    const store = useGenerationStore();
+    await store.load();
+    store.draft.prompt = "A tree";
+
+    const submission = store.submit();
+    await vi.waitFor(() => expect(store.pendingSubmission?.sessionId).toBe("session-a"));
+    await store.openSession("session-b");
+
+    expect(store.pendingSubmission).toBeNull();
+    pending.reject(new Error("network timeout"));
+    await expect(submission).rejects.toThrow("network timeout");
   });
 
   it("keeps the base route empty even when history exists", async () => {
@@ -119,6 +138,23 @@ describe("generation submission flow", () => {
     expect(api.generation.sessions).toHaveBeenCalledTimes(2);
     expect(store.sessions).toEqual([]);
     expect(store.active).toBeNull();
+  });
+
+  it("refreshes the session when deletion is blocked by a server-side active task", async () => {
+    const summary = { id: session.id, title: session.title, thumbnailUrl: null, createdAt: session.createdAt, updatedAt: session.updatedAt };
+    const activeSession = { ...session, tasks: [{ ...task, status: "generating" as const }] };
+    vi.mocked(api.generation.sessions).mockResolvedValueOnce({ items: [summary] });
+    vi.mocked(api.generation.session)
+      .mockResolvedValueOnce({ ...session, tasks: [] })
+      .mockResolvedValueOnce(activeSession);
+    vi.mocked(api.generation.deleteSession).mockRejectedValueOnce(new Error("生成任务进行中，暂不能删除会话"));
+    const store = useGenerationStore();
+
+    await store.load(session.id);
+    await expect(store.removeSession(session.id)).rejects.toThrow("生成任务进行中");
+
+    expect(api.generation.session).toHaveBeenCalledTimes(2);
+    expect(store.active?.tasks[0]?.status).toBe("generating");
   });
 
   it("does not resurrect a session when its load resolves after a reset", async () => {
@@ -282,6 +318,27 @@ describe("generation submission flow", () => {
       await reconnected.emit("task.succeeded", { lastEventId: "7" } as MessageEvent);
       expect(store.active?.tasks[0]?.status).toBe("succeeded");
       expect(reconnected.closed).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reconciles an active task after SSE disconnects", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(api.generation.session).mockResolvedValueOnce({ ...session, tasks: [task] });
+      vi.mocked(api.generation.task).mockResolvedValue({ ...task, status: "succeeded" });
+      const store = useGenerationStore();
+      await store.load(session.id);
+
+      expect(api.generation.task).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.waitFor(() => expect(api.generation.task).toHaveBeenCalledWith(task.id));
+      expect(store.active?.tasks[0]?.status).toBe("succeeded");
+
+      const calls = vi.mocked(api.generation.task).mock.calls.length;
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(api.generation.task).toHaveBeenCalledTimes(calls);
     } finally {
       vi.useRealTimers();
     }
@@ -451,11 +508,11 @@ describe("generation submission flow", () => {
 
     const submission = store.submit();
 
-    expect(store.pendingSubmission).toEqual(expect.objectContaining({
+    await vi.waitFor(() => expect(store.pendingSubmission).toEqual(expect.objectContaining({
       prompt: "Generate four related posters", imageCountMode: "AUTO", status: "preparing",
-    }));
+    })));
     expect(store.draft.prompt).toBe("");
-    expect(store.active).toBeNull();
+    expect(store.active?.id).toBe(session.id);
     expect(store.quota).toEqual(quota);
 
     pending.resolve({ status: "ready", planToken: "signed-plan", expiresAt: "2099-01-01T00:00:00Z",
@@ -550,6 +607,7 @@ describe("generation submission flow", () => {
       const submission = store.submit();
       let settled = false;
       void submission.finally(() => { settled = true; });
+      await vi.advanceTimersByTimeAsync(0);
       expect(store.pendingSubmission).toEqual(expect.objectContaining({ status: "preparing" }));
       await vi.advanceTimersByTimeAsync(125_000);
 
@@ -647,7 +705,10 @@ describe("generation submission flow", () => {
 
     store.startNewSession();
     store.draft.prompt = "A tree";
-    vi.mocked(api.generation.submit).mockResolvedValueOnce({ session: { ...session, tasks: [task] }, task, quota, replayed: false });
+    const nextSession = { ...session, id: "session-2" };
+    const nextTask = { ...task, id: "task-2", sessionId: nextSession.id };
+    vi.mocked(api.generation.createSession).mockResolvedValueOnce(nextSession);
+    vi.mocked(api.generation.submit).mockResolvedValueOnce({ session: { ...nextSession, tasks: [nextTask] }, task: nextTask, quota, replayed: false });
     await store.submit();
 
     const calls = vi.mocked(api.generation.submit).mock.calls;

@@ -335,6 +335,46 @@ class GenerationV2SlotProcessorTest {
   }
 
   @Test
+  void skipsQualityEvaluationOnThirdIterationAndStillPublishesTheImage() {
+    GenerationV2SlotProcessor qualityProcessor = new GenerationV2SlotProcessor(
+        generation, v2, settlement, imageModel, output, moderator, json, quality, 3, 0.8);
+    GenerationAttempt attempt = new GenerationAttempt(EXECUTION_ID + ":1", 1, 3);
+    givenExecution(List.of(0), 2, List.of(slotRecord(0, GenerationSlotStatus.WAITING, null)));
+    when(imageModel.generate(any(), eq(attempt))).thenReturn(response());
+    RefinementPatch firstPatch = new RefinementPatch("first repair", List.of(),
+        List.of("strengthen composition"), List.of(), List.of("COMPOSITION"));
+    RefinementPatch secondPatch = new RefinementPatch("second repair", List.of(),
+        List.of("strengthen hierarchy"), List.of(), List.of("HIERARCHY"));
+    when(quality.evaluate(any(), any(), any(), eq(1))).thenReturn(
+        new QualityEvaluationModel.EvaluationResult(
+            new EvaluationReport(false, 0.5, List.of("COMPOSITION"), true, List.of(), "quality-v1"),
+            firstPatch));
+    when(quality.evaluate(any(), any(), any(), eq(2))).thenReturn(
+        new QualityEvaluationModel.EvaluationResult(
+            new EvaluationReport(false, 0.6, List.of("HIERARCHY"), true, List.of(), "quality-v1"),
+            secondPatch));
+    StoredGenerationResult result = stored(0);
+    when(output.persist(any(), any())).thenReturn(List.of(result));
+    when(settlement.publishSlot(EXECUTION_ID, TASK_ID, 0, result, 2)).thenReturn(true);
+    when(settlement.completeExecution(EXECUTION_ID, TASK_ID, 1)).thenReturn(true);
+
+    assertThat(qualityProcessor.process(EXECUTION_ID, attempt).status())
+        .isEqualTo(GenerationProcessor.Status.SUCCEEDED);
+
+    ArgumentCaptor<ImageGenerationModel.ImageGenerationRequest> requests =
+        ArgumentCaptor.forClass(ImageGenerationModel.ImageGenerationRequest.class);
+    verify(imageModel, times(3)).generate(requests.capture(), eq(attempt));
+    assertThat(requests.getAllValues()).extracting(ImageGenerationModel.ImageGenerationRequest::iteration)
+        .containsExactly(1, 2, 3);
+    verify(quality, times(2)).evaluate(any(), any(), any(), anyInt());
+    verify(quality, never()).evaluate(any(), any(), any(), eq(3));
+    verify(v2).insertTaskEvent(eq(TASK_ID), eq("task.slot.quality_skipped"), eq("GENERATING"), anyString());
+    verify(moderator).moderateOutput(any(), any());
+    verify(output).persist(any(), any());
+    verify(settlement).publishSlot(EXECUTION_ID, TASK_ID, 0, result, 2);
+  }
+
+  @Test
   void exhaustedDeliveryFailsItsActiveSlotThroughV2Settlement() {
     GenerationExecutionRecord execution = new GenerationExecutionRecord(EXECUTION_ID, TASK_ID,
         GenerationExecutionKind.INITIAL, GenerationExecutionStatus.GENERATING, "execution-key",

@@ -21,11 +21,11 @@ public interface GenerationMapper {
   int renameSession(@Param("userId") String userId, @Param("id") String id, @Param("title") String title);
   @Update("UPDATE \"GenerationSession\" SET \"draft\" = CAST(#{draft} AS JSONB), \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = #{id} AND \"userId\" = #{userId}")
   int updateDraft(@Param("userId") String userId, @Param("id") String id, @Param("draft") String draft);
-  @Delete("WITH deleted_preflights AS (DELETE FROM \"GenerationPreflight\" WHERE \"userId\" = #{userId} AND \"sessionId\" = #{id} AND \"status\" NOT IN ('QUEUED','PLANNING','READY') RETURNING \"id\") DELETE FROM \"GenerationSession\" WHERE \"id\" = #{id} AND \"userId\" = #{userId} AND NOT EXISTS (SELECT 1 FROM \"GenerationTask\" WHERE \"sessionId\" = #{id} AND \"status\" IN ('QUEUED','GENERATING')) AND NOT EXISTS (SELECT 1 FROM \"GenerationPreflight\" WHERE \"sessionId\" = #{id} AND \"status\" IN ('QUEUED','PLANNING','READY'))")
+  @Delete("WITH deleted_preflights AS (DELETE FROM \"GenerationPreflight\" WHERE \"userId\" = #{userId} AND \"sessionId\" = #{id} AND (\"status\" NOT IN ('QUEUED','PLANNING','READY') OR (\"status\" = 'READY' AND \"expiresAt\" <= CURRENT_TIMESTAMP)) RETURNING \"id\") DELETE FROM \"GenerationSession\" WHERE \"id\" = #{id} AND \"userId\" = #{userId} AND NOT EXISTS (SELECT 1 FROM \"GenerationTask\" WHERE \"sessionId\" = #{id} AND \"status\" IN ('QUEUED','GENERATING')) AND NOT EXISTS (SELECT 1 FROM \"GenerationPreflight\" WHERE \"sessionId\" = #{id} AND (\"status\" IN ('QUEUED','PLANNING') OR (\"status\" = 'READY' AND \"expiresAt\" > CURRENT_TIMESTAMP)))")
   int deleteSession(@Param("userId") String userId, @Param("id") String id);
   @Select("SELECT COUNT(*) FROM \"GenerationTask\" WHERE \"sessionId\" = #{id} AND \"status\" IN ('QUEUED','GENERATING')")
   int countActiveTasks(String id);
-  @Select("SELECT COUNT(*) FROM \"GenerationPreflight\" WHERE \"sessionId\" = #{id} AND \"status\" IN ('QUEUED','PLANNING','READY')")
+  @Select("SELECT COUNT(*) FROM \"GenerationPreflight\" WHERE \"sessionId\" = #{id} AND (\"status\" IN ('QUEUED','PLANNING') OR (\"status\" = 'READY' AND \"expiresAt\" > CURRENT_TIMESTAMP))")
   int countActivePreflights(String id);
 
   @Select("SELECT * FROM \"GenerationTask\" WHERE \"id\" = #{id} LIMIT 1") GenerationTaskRecord findTask(String id);

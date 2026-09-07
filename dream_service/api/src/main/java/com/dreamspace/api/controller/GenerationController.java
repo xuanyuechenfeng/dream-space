@@ -73,7 +73,8 @@ public class GenerationController {
   @PostMapping("/tasks")
   GenerationService.SubmitResponse submit(@RequestBody GenerationService.TaskRequest body, HttpServletRequest request) {
     if (body != null && body.planToken() != null) {
-      return preflights.create(user(request), new CollectionPreflightService.CreateRequest(body.idempotencyKey(), body.planToken()));
+      return preflights.create(user(request), new CollectionPreflightService.CreateRequest(
+          body.idempotencyKey(), body.planToken(), body.sessionId()));
     }
     return service.submit(user(request), body);
   }

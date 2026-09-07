@@ -66,7 +66,7 @@ function isSubmitResponse(value: unknown): value is GenerationSubmitResponse {
 
 export interface PendingGenerationSubmission {
   id: string;
-  sessionId?: string;
+  sessionId: string;
   prompt: string;
   imageIds?: string[];
   ratio: GenerationDraft["ratio"];
@@ -86,26 +86,53 @@ export interface PendingGenerationSubmission {
 
 const pendingSubmissionStorageKey = "dream-space:generation:pending-submission";
 
+function pendingSubmissionKey(sessionId: string): string {
+  return `${pendingSubmissionStorageKey}:${sessionId}`;
+}
+
 function pendingStorage(): Storage | null {
   try { return typeof window === "undefined" ? null : window.sessionStorage; }
   catch { return null; }
 }
 
-function readPersistedPending(): PendingGenerationSubmission | null {
+function isPersistedPending(value: unknown, sessionId: string): value is PendingGenerationSubmission {
+  if (typeof value !== "object" || value === null) return false;
+  const pending = value as Partial<PendingGenerationSubmission>;
+  return typeof pending.id === "string" && pending.id.length > 0 && pending.sessionId === sessionId;
+}
+
+function readPersistedPending(sessionId?: string): PendingGenerationSubmission | null {
+  if (!sessionId) return null;
   const storage = pendingStorage();
   if (!storage) return null;
   try {
-    const value = JSON.parse(storage.getItem(pendingSubmissionStorageKey) || "null");
-    return value && typeof value === "object" && typeof value.id === "string" ? value as PendingGenerationSubmission : null;
+    const scoped = JSON.parse(storage.getItem(pendingSubmissionKey(sessionId)) || "null");
+    if (isPersistedPending(scoped, sessionId)) return scoped;
+    // Migrate the former singleton value only when its ownership is explicit.
+    const legacy = JSON.parse(storage.getItem(pendingSubmissionStorageKey) || "null");
+    if (!isPersistedPending(legacy, sessionId)) return null;
+    storage.setItem(pendingSubmissionKey(sessionId), JSON.stringify(legacy));
+    storage.removeItem(pendingSubmissionStorageKey);
+    return legacy;
   } catch { return null; }
 }
 
-function persistPending(value: PendingGenerationSubmission | null) {
+function persistPending(value: PendingGenerationSubmission) {
   const storage = pendingStorage();
   if (!storage) return;
   try {
-    if (value) storage.setItem(pendingSubmissionStorageKey, JSON.stringify({ ...value, planToken: undefined }));
-    else storage.removeItem(pendingSubmissionStorageKey);
+    storage.setItem(pendingSubmissionKey(value.sessionId), JSON.stringify({ ...value, planToken: undefined }));
+  } catch { /* session storage can be unavailable in privacy mode */ }
+}
+
+function removePersistedPending(sessionId?: string) {
+  if (!sessionId) return;
+  const storage = pendingStorage();
+  if (!storage) return;
+  try {
+    storage.removeItem(pendingSubmissionKey(sessionId));
+    const legacy = JSON.parse(storage.getItem(pendingSubmissionStorageKey) || "null");
+    if (isPersistedPending(legacy, sessionId)) storage.removeItem(pendingSubmissionStorageKey);
   } catch { /* session storage can be unavailable in privacy mode */ }
 }
 
@@ -127,6 +154,7 @@ export const useGenerationStore = defineStore("generation", () => {
   const sources = new Map<string, EventSource>();
   const reconnectTimers = new Map<string, number>();
   const taskRefreshVersions = new Map<string, number>();
+  let activeTaskRefreshTimer: number | undefined;
   const pendingSubmissionKeys = new Map<string, string>();
   const pendingPlanTokens = new Map<string, string>();
   const pendingContinuationKeys = new Map<string, string>();
@@ -137,8 +165,8 @@ export const useGenerationStore = defineStore("generation", () => {
   let cancelPreflightWait: (() => void) | null = null;
   const estimatedCost = computed(() => (resolutionOption(options.value?.resolutions ?? [], draft.value.resolution)?.unitCost ?? 1) * (draft.value.imageCount ?? 1));
 
-  function restorePersistedPending() {
-    const persisted = readPersistedPending();
+  function restorePersistedPending(sessionId = active.value?.id) {
+    const persisted = readPersistedPending(sessionId);
     if (!persisted) return false;
     pendingSubmission.value = persisted;
     if (persisted.idempotencyKey && persisted.fingerprint) pendingSubmissionKeys.set(persisted.fingerprint, persisted.idempotencyKey);
@@ -147,8 +175,9 @@ export const useGenerationStore = defineStore("generation", () => {
   }
 
   async function resumePendingSubmission(): Promise<GenerationSubmitResponse | null> {
-    const pending = pendingSubmission.value ?? readPersistedPending();
-    if (!pending || pending.status !== "preparing") return null;
+    const sessionId = active.value?.id;
+    const pending = pendingSubmission.value ?? readPersistedPending(sessionId);
+    if (!pending || pending.status !== "preparing" || pending.sessionId !== sessionId) return null;
     pendingSubmission.value = pending;
     draft.value = normalizeDraft({ mode: "AUTO", prompt: pending.prompt,
       imageIds: pending.imageIds ?? [], ratio: pending.ratio, resolution: pending.resolution,
@@ -235,10 +264,28 @@ export const useGenerationStore = defineStore("generation", () => {
       sources.delete(taskId);
       return;
     }
+    stopActiveTaskRefresh();
     for (const timer of reconnectTimers.values()) window.clearTimeout(timer);
     reconnectTimers.clear();
     for (const source of sources.values()) { source.onerror = null; source.close(); }
     sources.clear();
+  }
+  function stopActiveTaskRefresh() {
+    if (activeTaskRefreshTimer !== undefined) window.clearInterval(activeTaskRefreshTimer);
+    activeTaskRefreshTimer = undefined;
+  }
+  async function refreshActiveTasks() {
+    const tasks = active.value?.tasks.filter(task => activeTaskStatuses.has(task.status)) ?? [];
+    if (!tasks.length) {
+      stopActiveTaskRefresh();
+      return;
+    }
+    await Promise.all(tasks.map(task => refreshTask(task.id).catch(() => undefined)));
+  }
+  function startActiveTaskRefresh() {
+    stopActiveTaskRefresh();
+    if (!(active.value?.tasks.some(task => activeTaskStatuses.has(task.status)))) return;
+    activeTaskRefreshTimer = window.setInterval(() => { void refreshActiveTasks(); }, 5_000);
   }
   function clearSessionState() {
     // Close only this page's local wait. The server-side preflight and its
@@ -246,11 +293,12 @@ export const useGenerationStore = defineStore("generation", () => {
     cancelPreflightWait?.();
     cancelPreflightWait = null;
     closeEvents();
+    stopActiveTaskRefresh();
     draftWriteVersion += 1;
     taskRefreshVersions.clear();
     retryingTaskIds.value = new Set();
     notice.value = "";
-    pendingSubmission.value = readPersistedPending();
+    pendingSubmission.value = null;
     active.value = null;
     draft.value = blankDraft();
     eventCursors.value = {};
@@ -261,7 +309,6 @@ export const useGenerationStore = defineStore("generation", () => {
     sessionlessEpoch += 1;
     clearSessionState();
     pendingSubmission.value = null;
-    persistPending(null);
     loading.value = false;
     error.value = "";
   }
@@ -280,7 +327,7 @@ export const useGenerationStore = defineStore("generation", () => {
         if (transition !== sessionTransition) return;
         activateSession(session);
       }
-      if (pendingSubmission.value?.status === "preparing") {
+      if (pendingSubmission.value?.status === "preparing" && pendingSubmission.value.sessionId === active.value?.id) {
         void resumePendingSubmission().catch(() => { /* submit state remains recoverable in session storage */ });
       }
       error.value = "";
@@ -297,7 +344,9 @@ export const useGenerationStore = defineStore("generation", () => {
     draftWriteVersion += 1;
     taskRefreshVersions.clear();
     active.value = session; draft.value = normalizeDraft(session.draft as Partial<GenerationDraft> | null); applyOptions(); eventCursors.value = {};
+    pendingSubmission.value = readPersistedPending(session.id);
     for (const task of session.tasks) if (activeTaskStatuses.has(task.status)) connectEvents(task.id);
+    startActiveTaskRefresh();
   }
   async function openSession(id: string): Promise<GenerationSession | null> {
     const transition = ++sessionTransition;
@@ -308,6 +357,9 @@ export const useGenerationStore = defineStore("generation", () => {
       const session = await api.generation.session(id);
       if (transition !== sessionTransition) return null;
       activateSession(session);
+      if (pendingSubmission.value?.status === "preparing") {
+        void resumePendingSubmission().catch(() => { /* keep the recoverable pending state */ });
+      }
       return session;
     } catch (cause) {
       if (transition !== sessionTransition) return null;
@@ -329,7 +381,26 @@ export const useGenerationStore = defineStore("generation", () => {
   async function removeSession(id: string) {
     const transition = ++sessionTransition;
     if (active.value?.id === id) closeEvents();
-    await api.generation.deleteSession(id);
+    try {
+      await api.generation.deleteSession(id);
+    } catch (cause) {
+      // A server-side activity guard is authoritative. Refresh the session
+      // before surfacing the error so queued/generating tasks cannot remain
+      // invisible in the timeline after a failed delete attempt.
+      if (transition === sessionTransition) {
+        try {
+          const latest = await api.generation.session(id);
+          if (transition === sessionTransition) {
+            activateSession(latest);
+            sessions.value = sessions.value.map(item => item.id === id
+              ? { ...item, title: latest.title, updatedAt: latest.updatedAt } : item);
+          }
+        } catch {
+          // Preserve the original delete error when the refresh also fails.
+        }
+      }
+      throw cause;
+    }
     if (transition !== sessionTransition) return;
     sessions.value = sessions.value.filter(item => item.id !== id);
     // Reconcile with the server so a stale client cannot show a deleted row
@@ -393,24 +464,34 @@ export const useGenerationStore = defineStore("generation", () => {
   async function submit(): Promise<GenerationSubmitResponse> {
     if (uploadsInFlight.value > 0) throw new Error("素材正在上传，请稍后再生成");
     if (submitting.value) throw new Error("生成请求正在提交，请稍后重试");
-    const persistedPending = pendingSubmission.value;
     const snapshot = submissionSnapshot(draft.value);
     const transition = sessionTransition;
-    const writeVersion = ++draftWriteVersion;
     submitting.value = true;
     notice.value = "";
     let fingerprint: string | null = null;
     let pendingId = "";
     try {
-      // The API creates a session atomically when sessionId is omitted. This
-      // keeps the first submit from creating an orphan session with no task.
-      const sessionId = active.value?.id;
+      let sessionId = active.value?.id;
+      if (!sessionId) {
+        const created = await api.generation.createSession(snapshot);
+        if (transition !== sessionTransition) {
+          throw Object.assign(new Error("生成准备已取消"), { status: 499, code: "GENERATION_PREPARATION_CANCELLED" });
+        }
+        const summary = { id: created.id, title: created.title, thumbnailUrl: created.thumbnailUrl,
+          createdAt: created.createdAt, updatedAt: created.updatedAt };
+        sessions.value = sortSessions([summary, ...sessions.value.filter(item => item.id !== created.id)]);
+        activateSession(created);
+        draft.value = normalizeDraft(snapshot);
+        sessionId = created.id;
+      }
+      const writeVersion = ++draftWriteVersion;
+      const persistedPending = pendingSubmission.value?.sessionId === sessionId ? pendingSubmission.value : null;
       fingerprint = persistedPending?.fingerprint ?? submissionFingerprint(sessionId, sessionlessEpoch, snapshot);
       const idempotencyKey = persistedPending?.idempotencyKey
         ?? pendingSubmissionKeys.get(fingerprint) ?? `web-${createUuid()}`;
       pendingSubmissionKeys.set(fingerprint, idempotencyKey);
-      const persisted = pendingSubmission.value?.fingerprint === fingerprint ? pendingSubmission.value : null;
-      pendingId = pendingSubmission.value?.id ?? `pending-${createUuid()}`;
+      const persisted = persistedPending?.fingerprint === fingerprint ? persistedPending : null;
+      pendingId = persistedPending?.id ?? `pending-${createUuid()}`;
       pendingSubmission.value = {
         id: pendingId, sessionId, prompt: snapshot.prompt, ratio: snapshot.ratio,
         resolution: snapshot.resolution, width: snapshot.width, height: snapshot.height,
@@ -430,7 +511,7 @@ export const useGenerationStore = defineStore("generation", () => {
             ? await api.generation.preflightStatus(pendingSubmission.value.preflightId)
             : await api.generation.preflight({ ...snapshot,
               imageCountMode: countMode, imageCount: countMode === "AUTO" ? null : Number(countMode),
-              draftKey: fingerprint, ...(sessionId ? { sessionId } : {}), idempotencyKey: `preflight-${idempotencyKey}` });
+              draftKey: fingerprint, sessionId, idempotencyKey: `preflight-${idempotencyKey}` });
           if (pendingSubmission.value?.id === pendingId && "id" in preflight) {
             pendingSubmission.value = { ...pendingSubmission.value, preflightId: preflight.id };
             persistPending(pendingSubmission.value);
@@ -444,14 +525,14 @@ export const useGenerationStore = defineStore("generation", () => {
             persistPending(pendingSubmission.value);
           }
         }
-        result = await api.generation.createFromPreflight({ idempotencyKey, planToken });
+        result = await api.generation.createFromPreflight({ idempotencyKey, planToken, sessionId });
       } else {
-        result = await api.generation.submit({ ...snapshot, mode: "AUTO", ...(sessionId ? { sessionId } : {}), idempotencyKey });
+        result = await api.generation.submit({ ...snapshot, mode: "AUTO", sessionId, idempotencyKey });
       }
       if (!isSubmitResponse(result)) throw new Error("生成接口返回数据无效，请稍后重试");
       pendingSubmissionKeys.delete(fingerprint);
       pendingPlanTokens.delete(fingerprint);
-      persistPending(null);
+      removePersistedPending(sessionId);
       if (pendingSubmission.value?.id === pendingId) pendingSubmission.value = null;
       quota.value = result.quota;
       const summary = { id: result.session.id, title: result.session.title, thumbnailUrl: result.session.thumbnailUrl, createdAt: result.session.createdAt, updatedAt: result.session.updatedAt };
@@ -464,7 +545,9 @@ export const useGenerationStore = defineStore("generation", () => {
       draft.value = normalizeDraft(result.session.draft as Partial<GenerationDraft> | null);
       draft.value.prompt = composerPrompt;
       applyOptions();
-      connectEvents(result.task.id); return result;
+      connectEvents(result.task.id);
+      startActiveTaskRefresh();
+      return result;
     } catch (cause) {
       if (fingerprint && isDefinitiveApiError(cause)) {
         pendingSubmissionKeys.delete(fingerprint);
@@ -491,12 +574,16 @@ export const useGenerationStore = defineStore("generation", () => {
     active.value.tasks = active.value.tasks.map(item => item.id === task.id ? task : item);
     return task;
   }
-  function clearPendingSubmission() { pendingSubmission.value = null; persistPending(null); }
+  function clearPendingSubmission() {
+    removePersistedPending(pendingSubmission.value?.sessionId ?? active.value?.id);
+    pendingSubmission.value = null;
+  }
   function restorePendingSubmission() {
     if (!pendingSubmission.value) return false;
+    const sessionId = pendingSubmission.value.sessionId;
     draft.value.prompt = pendingSubmission.value.prompt;
     pendingSubmission.value = null;
-    persistPending(null);
+    removePersistedPending(sessionId);
     return true;
   }
   async function cancel(id: string) {
@@ -599,6 +686,7 @@ export const useGenerationStore = defineStore("generation", () => {
         }
         if (id) eventCursors.value[taskId] = Math.max(eventCursors.value[taskId] ?? 0, id);
         if (terminalTaskStatuses.has(task.status)) closeEvents(taskId);
+        startActiveTaskRefresh();
       } catch {
         if (sources.get(taskId) === source) scheduleReconnect(taskId);
       }

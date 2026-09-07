@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend full-scope quality check entry."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Verify session-scoped pending and server-authoritative projections."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify frontend tests and quality requirements."}
+{"file":".trellis/spec/backend/index.md","reason":"Backend full-scope quality check entry."}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Verify session, preflight, task, and quota invariants."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Verify safe structured observability."}

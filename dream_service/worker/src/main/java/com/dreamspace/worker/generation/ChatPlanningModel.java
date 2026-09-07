@@ -10,37 +10,66 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import com.dreamspace.worker.observability.WorkerMetrics;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.retry.TransientAiException;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.util.MimeTypeUtils;
-import com.dreamspace.worker.observability.WorkerMetrics;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public final class ChatPlanningModel implements PlanningModel {
   private static final Logger log = LoggerFactory.getLogger(ChatPlanningModel.class);
   private static final String RULES = "Return one strict JSON object only. Do not return Markdown. Do not invent facts, numbers, brands or statistics. Unknown fields may be ignored by the consumer. ";
   private static final String REPAIR_RULES = "Repair the supplied syntactically invalid JSON into exactly one valid JSON object. Preserve all field names, values and nesting; only fix JSON syntax. Return JSON only, without Markdown or explanation.";
-  private static final OpenAiChatOptions JSON_OPTIONS = OpenAiChatOptions.builder()
-      .responseFormat(OpenAiChatModel.ResponseFormat.builder()
-          .type(OpenAiChatModel.ResponseFormat.Type.JSON_OBJECT).build())
-      .build();
-  private final ChatModel model;
+  @FunctionalInterface
+  private interface PlanningClient {
+    String call(String instructions, String userText, List<ReferenceImage> images);
+  }
+
+  private final PlanningClient model;
   private final ObjectMapper json;
   private final ReferenceImageLoader references;
   private final WorkerMetrics metrics;
   private final String modelName;
 
+  public ChatPlanningModel(ResponsesPlanningClient model, ObjectMapper json, ReferenceImageLoader references,
+      WorkerMetrics metrics, String modelName) {
+    this.model = model::call;
+    this.json = json.copy().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+    this.references = references; this.metrics = metrics; this.modelName = modelName;
+  }
+
+  /** Compatibility constructor retained for focused legacy unit tests; production wiring uses Responses. */
   public ChatPlanningModel(ChatModel model, ObjectMapper json, ReferenceImageLoader references,
       WorkerMetrics metrics, String modelName) {
-    this.model = model;
+    this.model = (instructions, userText, images) -> {
+      List<Media> media = new ArrayList<>();
+      int index = 1;
+      if (images != null) {
+        for (ReferenceImage image : images) {
+          if (image == null || image.bytes() == null) continue;
+          String mime = image.mimeType() == null || image.mimeType().isBlank()
+              ? "application/octet-stream" : image.mimeType();
+          media.add(Media.builder().id("input-image-" + index).name("input-image-" + index++)
+              .mimeType(MimeTypeUtils.parseMimeType(mime)).data(new ByteArrayResource(image.bytes())).build());
+        }
+      }
+      OpenAiChatOptions options = OpenAiChatOptions.builder()
+          .responseFormat(OpenAiChatModel.ResponseFormat.builder()
+              .type(OpenAiChatModel.ResponseFormat.Type.JSON_OBJECT).build()).build();
+      ChatResponse response = model.call(new Prompt(List.of(new SystemMessage(instructions),
+          UserMessage.builder().text(userText).media(media).build()), options));
+      if (response == null || response.getResult() == null || response.getResult().getOutput() == null) return null;
+      return response.getResult().getOutput().getText();
+    };
     this.json = json.copy().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     this.references = references; this.metrics = metrics; this.modelName = modelName;
@@ -125,16 +154,13 @@ public final class ChatPlanningModel implements PlanningModel {
         .addKeyValue("model", modelName).addKeyValue("inputImageCount", task.imageIds().size())
         .log("planning model request started");
     try {
-      var response = model.call(jsonPrompt(system, userMessage(task, user)));
-      if (response == null || response.getResult() == null || response.getResult().getOutput() == null)
-        throw new GenerationProviderException("PLANNING_EMPTY_RESPONSE", "planning model returned no response", true);
-      String text = response.getResult().getOutput().getText();
+      String text = model.call(system, userMessage(task, user), references(task));
       responseLength = text == null ? 0 : text.length();
       responsePreview = preview(text);
       log.atInfo().addKeyValue("taskId", task.id()).addKeyValue("stage", type.getSimpleName())
           .addKeyValue("responseLength", responseLength)
-          .addKeyValue("response", text)
-          .log("planning model raw response received (length=" + responseLength + ", response=" + text + ")");
+          .addKeyValue("responsePreview", responsePreview)
+          .log("planning model raw response received (length=" + responseLength + ", preview=" + responsePreview + ")");
       if (text == null || text.isBlank())
         throw new GenerationProviderException("PLANNING_OUTPUT_INVALID", "planning model returned empty output", false);
       String normalizedText = stripCodeFence(text);
@@ -149,8 +175,9 @@ public final class ChatPlanningModel implements PlanningModel {
         responseLength = repairedText == null ? 0 : repairedText.length();
         responsePreview = preview(repairedText);
         log.atInfo().addKeyValue("taskId", task.id()).addKeyValue("stage", type.getSimpleName())
-            .addKeyValue("responseLength", responseLength).addKeyValue("response", repairedText)
-            .log("planning model repair raw response received (response=" + repairedText + ")");
+            .addKeyValue("responseLength", responseLength)
+            .addKeyValue("responsePreview", responsePreview)
+            .log("planning model repair response received (length=" + responseLength + ", preview=" + responsePreview + ")");
         if (repairedText == null || repairedText.isBlank())
           throw new GenerationProviderException("PLANNING_OUTPUT_INVALID", "planning model returned empty repair output", false);
         parsed = json.readTree(stripCodeFence(repairedText));
@@ -170,10 +197,6 @@ public final class ChatPlanningModel implements PlanningModel {
           .log("planning model request failed (responseLength=" + responseLength + ", responseShape=" + responseShape
               + ", preview=" + responsePreview + ")", error);
       throw error;
-    } catch (TransientAiException error) {
-      log.atWarn().addKeyValue("taskId", task.id()).addKeyValue("stage", type.getSimpleName())
-          .addKeyValue("errorCode", "PLANNING_TEMPORARILY_UNAVAILABLE").log("planning model is temporarily unavailable");
-      throw new GenerationProviderException("PLANNING_TEMPORARILY_UNAVAILABLE", "planning model is temporarily unavailable", true, error);
     } catch (IllegalArgumentException error) {
       log.atWarn().addKeyValue("taskId", task.id()).addKeyValue("stage", type.getSimpleName())
           .addKeyValue("errorCode", "PLANNING_OUTPUT_INVALID")
@@ -205,15 +228,7 @@ public final class ChatPlanningModel implements PlanningModel {
   }
 
   private String repair(String malformedJson) {
-    var response = model.call(jsonPrompt(REPAIR_RULES,
-        UserMessage.builder().text("Invalid JSON to repair:\n" + malformedJson).build()));
-    if (response == null || response.getResult() == null || response.getResult().getOutput() == null)
-      throw new GenerationProviderException("PLANNING_EMPTY_RESPONSE", "planning model returned no repair response", true);
-    return response.getResult().getOutput().getText();
-  }
-
-  private static Prompt jsonPrompt(String system, UserMessage user) {
-    return new Prompt(List.of(new SystemMessage(system), user), JSON_OPTIONS);
+    return model.call(REPAIR_RULES, "Invalid JSON to repair:\n" + malformedJson, List.of());
   }
 
   private static void requireContractFields(JsonNode root, Class<?> type) {
@@ -485,17 +500,15 @@ public final class ChatPlanningModel implements PlanningModel {
     }
     return value.toString();
   }
-  private UserMessage userMessage(WorkerTaskSnapshot task, String text) {
-    List<Media> media = new ArrayList<>();
-    int index = 1;
-    for (String imageId : task.imageIds()) addReference(media, task, imageId, "input-image-" + index++);
-    return UserMessage.builder().text(text).media(media).build();
+  private String userMessage(WorkerTaskSnapshot task, String text) {
+    return text;
   }
 
-  private void addReference(List<Media> media, WorkerTaskSnapshot task, String id, String name) {
-    ReferenceImage image = references.load(task.userId(), id);
-    media.add(Media.builder().id(name).name(name).mimeType(MimeTypeUtils.parseMimeType(image.mimeType()))
-        .data(new ByteArrayResource(image.bytes())).build());
+  private List<ReferenceImage> references(WorkerTaskSnapshot task) {
+    if (task.imageIds() == null || task.imageIds().isEmpty()) return List.of();
+    List<ReferenceImage> images = new ArrayList<>();
+    for (String imageId : task.imageIds()) images.add(references.load(task.userId(), imageId));
+    return images;
   }
   private String input(WorkerTaskSnapshot task) {
     return "mode=" + task.mode() + "\nprompt=" + task.prompt() + "\nrequestedRatio=" + task.ratio()

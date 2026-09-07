@@ -19,7 +19,9 @@ import com.dreamspace.common.persistence.database.DatabaseEnums.GenerationInputM
 import com.dreamspace.common.persistence.database.DatabaseEnums.QuotaReconciliationRunStatus;
 import com.dreamspace.common.persistence.generation.GenerationTaskRecord;
 import com.dreamspace.common.persistence.generation.GenerationExecutionRecord;
+import com.dreamspace.common.persistence.generation.GenerationV2Mapper;
 import com.dreamspace.common.persistence.quota.QuotaAccountRecord;
+import com.dreamspace.common.persistence.quota.QuotaTransactionService;
 import com.dreamspace.worker.persistence.reconciliation.QuotaReconciliationMapper;
 import com.dreamspace.common.persistence.reconciliation.QuotaReconciliationRunRecord;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -138,10 +140,46 @@ class QuotaReconciliationServiceTest {
     verify(mapper).completeRun(anyString(), eq(1), eq(1), eq(2), eq(0));
   }
 
+  @Test void recoversAStaleGeneratingExecutionWithItsReserve() {
+    QuotaReconciliationMapper mapper = mock(QuotaReconciliationMapper.class);
+    GenerationV2Mapper generation = mock(GenerationV2Mapper.class);
+    QuotaTransactionService quota = mock(QuotaTransactionService.class);
+    Instant now = Instant.parse("2026-08-17T00:00:00Z");
+    GenerationExecutionRecord stale = execution(now.minusSeconds(7200), GenerationExecutionStatus.GENERATING, 4, 0, 0);
+    when(mapper.insertRun(anyString(), anyString())).thenReturn(1);
+    when(mapper.listAccounts()).thenReturn(List.of());
+    when(generation.listStaleExecutions(any(), eq(100))).thenReturn(List.of(stale));
+    when(generation.lockExecution("execution-1")).thenReturn(stale);
+    GenerationTaskRecord task = v2Task(now, GenerationTaskStatus.GENERATING, 0);
+    when(generation.findTaskForWorker("task-v2")).thenReturn(task);
+    when(generation.lockTask("user-1", "task-v2")).thenReturn(task);
+    when(quota.settle(eq("user-1"), eq("task-v2"), eq(4), eq("RELEASE"), eq("release:execution-1"),
+        eq("execution-1"), eq(null))).thenReturn(true);
+    when(generation.finishExecution("execution-1", 4, "FAILED", "STALE_EXECUTION_RECOVERED")).thenReturn(1);
+    when(generation.findActiveExecution("task-v2")).thenReturn(null);
+    when(generation.countSucceededSlots("task-v2")).thenReturn(0);
+    when(generation.setTaskV2Status("task-v2", "FAILED", "STALE_EXECUTION_RECOVERED", "生成任务超时，已自动结束", true)).thenReturn(1);
+    when(mapper.findRun(anyString())).thenReturn(run(now, 0, 0, 1, 1));
+
+    QuotaReconciliationService.Summary summary = newService(mapper, generation, quota).run(now, 3_600_000);
+
+    assertThat(summary.repairedCount()).isEqualTo(1);
+    verify(quota).settle(eq("user-1"), eq("task-v2"), eq(4), eq("RELEASE"), eq("release:execution-1"),
+        eq("execution-1"), eq(null));
+    verify(generation).setTaskV2Status("task-v2", "FAILED", "STALE_EXECUTION_RECOVERED", "生成任务超时，已自动结束", true);
+  }
+
   private static QuotaReconciliationService service(QuotaReconciliationMapper mapper) {
     PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
     when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
     return new QuotaReconciliationService(mapper, new ObjectMapper(), transactionManager);
+  }
+
+  private static QuotaReconciliationService newService(QuotaReconciliationMapper mapper,
+      GenerationV2Mapper generation, QuotaTransactionService quota) {
+    PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
+    when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
+    return new QuotaReconciliationService(mapper, new ObjectMapper(), transactionManager, generation, quota);
   }
 
   private static GenerationTaskRecord task(Instant now) {

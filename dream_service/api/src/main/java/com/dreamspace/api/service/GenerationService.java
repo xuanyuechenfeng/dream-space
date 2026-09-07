@@ -376,6 +376,9 @@ public class GenerationService {
 
   private Validated validate(String userId, TaskRequest request) {
     if (request == null) throw bad("VALIDATION_ERROR", "请求参数无效");
+    if (request.sessionId() == null || request.sessionId().isBlank())
+      throw bad("GENERATION_SESSION_REQUIRED", "请先创建会话再提交生成任务");
+    ownedSession(userId, request.sessionId());
     String key = request.idempotencyKey() == null ? "" : request.idempotencyKey().trim();
     if (!key.matches("[A-Za-z0-9:_-]{8,128}")) throw bad("VALIDATION_ERROR", "幂等键格式无效");
     String prompt = request.prompt() == null ? "" : request.prompt().trim();
@@ -415,7 +418,7 @@ public class GenerationService {
   }
 
   private boolean sameInput(GenerationTaskRecord existing, Validated input) {
-    return existing.sessionId().equals(input.sessionId() == null ? existing.sessionId() : input.sessionId())
+    return existing.sessionId().equals(input.sessionId())
         && existing.prompt().equals(input.prompt()) && existing.mode() == input.mode()
         && imageIds(existing).equals(input.imageIds())
         && existing.ratio().databaseValue().equals(input.ratio())

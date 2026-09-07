@@ -72,7 +72,7 @@ public class CollectionPreflightService {
   public record Ready(String status, String planToken, Instant expiresAt, String collectionMode,
       int targetImageCount, List<SlotSummary> slots, Output output, int unitCost, int estimatedCost, List<String> warnings) {}
   public record Output(String ratio, String resolution, Integer width, Integer height) {}
-  public record CreateRequest(String idempotencyKey, String planToken) {}
+  public record CreateRequest(String idempotencyKey, String planToken, String sessionId) {}
 
   public Object preflight(String userId, Request request) {
     Validated value = validate(userId, request);
@@ -117,19 +117,31 @@ public class CollectionPreflightService {
 
   public GenerationService.SubmitResponse create(String userId, CreateRequest request) {
     if (request == null || request.planToken() == null) throw bad("GENERATION_PREFLIGHT_EXPIRED", "预规划已失效");
+    if (request.sessionId() == null || request.sessionId().isBlank())
+      throw bad("GENERATION_SESSION_REQUIRED", "请先创建会话再提交生成任务");
+    generation.getSession(userId, request.sessionId());
     if (request.idempotencyKey() == null || !request.idempotencyKey().matches("[A-Za-z0-9:_-]{8,128}"))
       throw bad("VALIDATION_ERROR", "幂等键格式无效");
     Token token = verify(request.planToken());
+    GenerationPreflightRecord tokenPreflight = mapper.findPreflight(userId, token.preflightId());
+    if (tokenPreflight != null && tokenPreflight.sessionId() != null
+        && !request.sessionId().equals(tokenPreflight.sessionId()))
+      throw bad("GENERATION_SESSION_MISMATCH", "生成准备与会话不一致");
     // A lost HTTP response is safely replayed by create idempotency key. Check
     // this before requiring READY because the original transaction consumes
     // the preflight token as part of task creation.
     GenerationTaskRecord existing = request.idempotencyKey() == null ? null : generationTaskByKey(userId, request.idempotencyKey());
     if (existing != null) {
       if (!token.preflightId().equals(existing.preflightId())) throw bad("GENERATION_IDEMPOTENCY_CONFLICT", "幂等键已用于其他生成参数");
+      GenerationPreflightRecord replayPreflight = mapper.findPreflight(userId, token.preflightId());
+      if (replayPreflight == null || replayPreflight.sessionId() == null
+          || !request.sessionId().equals(replayPreflight.sessionId())
+          || !replayPreflight.sessionId().equals(existing.sessionId()))
+        throw bad("GENERATION_SESSION_MISMATCH", "生成任务与会话不一致");
       return new GenerationService.SubmitResponse(generation.getSession(userId, existing.sessionId()), generation.viewTask(userId, existing.id()), generation.quota(userId), true);
     }
     if (token.expiresAt().isBefore(Instant.now())) throw bad("GENERATION_PREFLIGHT_EXPIRED", "预规划已过期，请重新提交");
-    GenerationPreflightRecord preflight = mapper.findPreflight(userId, token.preflightId());
+    GenerationPreflightRecord preflight = tokenPreflight;
     if (preflight == null || preflight.status() == null || !"READY".equals(preflight.status().name())
         || !userId.equals(token.userId()) || !token.inputHash().equals(preflight.inputHash())
         || preflight.expiresAt() == null || !preflight.expiresAt().equals(token.expiresAt())
@@ -137,7 +149,11 @@ public class CollectionPreflightService {
     ImageCollectionPlan plan = readPlan(preflight.planJson());
     String taskId = UUID.randomUUID().toString();
     String sessionId = preflight.sessionId();
-    if (sessionId == null || sessionId.isBlank()) sessionId = UUID.randomUUID().toString();
+    if (sessionId == null || sessionId.isBlank())
+      throw bad("GENERATION_SESSION_REQUIRED", "请先创建会话再提交生成任务");
+    if (!sessionId.equals(request.sessionId()))
+      throw bad("GENERATION_SESSION_MISMATCH", "生成准备与会话不一致");
+    generation.getSession(userId, sessionId);
     final String sid = sessionId;
     String executionId = UUID.randomUUID().toString();
     String createKey = request.idempotencyKey() == null ? "create-" + UUID.randomUUID() : request.idempotencyKey();
@@ -162,15 +178,9 @@ public class CollectionPreflightService {
             || locked.imageCount() == null || locked.imageCount() != lockedPlan.slots().size()
             || estimatedCost != locked.unitCost() * lockedPlan.slots().size())
           throw bad("GENERATION_COLLECTION_PLAN_INVALID", "集合计划与计费快照不一致");
-        if (locked.sessionId() == null || locked.sessionId().isBlank()) {
-          if (mapper.insertSession(finalSession, userId, inputPrompt(locked), json(new GenerationService.Draft("AUTO", inputPrompt(locked),
-              json.convertValue(locked.inputJson().path("imageIds"), json.getTypeFactory().constructCollectionType(List.class, String.class)),
-              locked.ratio(), locked.resolution(), locked.width(), locked.height(),
-              locked.inputJson().path("imageCountMode").asText("AUTO"), lockedPlan.slots().size()))) != 1)
-            throw new IllegalStateException("generation session was not inserted");
-        } else {
-          generation.getSession(userId, finalSession);
-        }
+        if (locked.sessionId() == null || !finalSession.equals(locked.sessionId()))
+          throw bad("GENERATION_SESSION_MISMATCH", "生成准备与会话不一致");
+        generation.getSession(userId, finalSession);
         // Use the existing task mapper through the v1 service's shared mapper is intentionally avoided here;
         // v2 creation is delegated to a small JDBC statement in GenerationV2Mapper.
         if (mapper.insertTaskV2(taskId, finalSession, userId, inputPrompt(locked), "image-4.7", locked.ratio(), locked.resolution(), locked.width(), locked.height(), lockedPlan.slots().size(), inputImages(locked), locked.unitCost(), estimatedCost, createKey, locked.id(), locked.pricingRuleId(), locked.pricingRuleVersion()) != 1) throw new IllegalStateException("generation task was not inserted");
@@ -229,6 +239,9 @@ public class CollectionPreflightService {
 
   private Validated validate(String userId, Request r) {
     if (r == null || r.prompt() == null || r.prompt().isBlank()) throw bad("VALIDATION_ERROR", "提示词不能为空");
+    if (r.sessionId() == null || r.sessionId().isBlank())
+      throw bad("GENERATION_SESSION_REQUIRED", "请先创建会话再提交生成任务");
+    generation.getSession(userId, r.sessionId());
     if (r.prompt().trim().length() > 4000) throw bad("VALIDATION_ERROR", "提示词长度应为 1-4000 个字符");
     String key = r.idempotencyKey() == null ? "" : r.idempotencyKey().trim(); if (!key.matches("[A-Za-z0-9:_-]{8,128}")) throw bad("VALIDATION_ERROR", "幂等键格式无效");
     String draftKey = r.draftKey() == null || r.draftKey().isBlank() ? key : r.draftKey().trim();
@@ -269,7 +282,6 @@ public class CollectionPreflightService {
     input.put("draftKey", draftKey); input.put("sessionId", r.sessionId()); if (effectiveCount != null) input.put("imageCount", effectiveCount);
     if (r.width() != null) input.put("width", r.width());
     if (r.height() != null) input.put("height", r.height());
-    if (r.sessionId() != null && !r.sessionId().isBlank()) generation.getSession(userId, r.sessionId());
     input.set("imageIds", json.valueToTree(imageIds));
     return new Validated(key, draftKey, r.sessionId(), r.prompt().trim(), ratio, resolution, r.width(), r.height(), unit, rule == null ? null : rule.id(), rule == null ? null : rule.version(), sha256(input.toString()), input.toString());
   }

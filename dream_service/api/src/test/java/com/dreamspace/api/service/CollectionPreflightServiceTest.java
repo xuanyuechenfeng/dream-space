@@ -83,6 +83,49 @@ class CollectionPreflightServiceTest {
         });
   }
 
+  @Test
+  void rejectsPreflightWithoutFormalSession() {
+    CollectionPreflightService service = new CollectionPreflightService(mock(GenerationV2Mapper.class),
+        mock(GenerationService.class), mock(GenerationQueuePublisher.class),
+        mock(QuotaTransactionService.class), properties("test-preflight-secret"), json,
+        new TestTransactionManager(), null);
+
+    assertThatThrownBy(() -> service.preflight("user-1", new CollectionPreflightService.Request(
+        "preflight-key-123", "draft-key-123", null, "prompt", List.of(),
+        "1:1", "2K", 2048, 2048, "AUTO", null)))
+        .isInstanceOfSatisfying(ApiException.class,
+            error -> assertThat(error.code()).isEqualTo("GENERATION_SESSION_REQUIRED"));
+  }
+
+  @Test
+  void rejectsTaskCreationWhenRequestSessionDiffersFromPreflight() {
+    GenerationV2Mapper mapper = mock(GenerationV2Mapper.class);
+    GenerationService generation = mock(GenerationService.class);
+    ImageCollectionPlan plan = new ImageCollectionPlan("collection-v2", CollectionMode.VARIATIONS,
+        json.createObjectNode(), List.of(slot(0)), 0.95, List.of());
+    Instant readyAt = Instant.now();
+    GenerationPreflightRecord preflight = new GenerationPreflightRecord(
+        "preflight-1", "user-1", "session-a", GenerationPreflightStatus.READY,
+        "preflight-key", "draft-key", "input-hash", json.createObjectNode(), json.valueToTree(plan),
+        "collection-v2", CollectionMode.VARIATIONS, 1, "1:1", "2K", 2048, 2048,
+        "rule-1", 1, 1, 1, null, null, readyAt, readyAt.plusSeconds(600), null, null, readyAt, readyAt);
+    when(mapper.findPreflight("user-1", "preflight-1")).thenReturn(preflight);
+    CollectionPreflightService service = new CollectionPreflightService(mapper, generation,
+        mock(GenerationQueuePublisher.class), mock(QuotaTransactionService.class),
+        properties("test-preflight-secret"), json, new TestTransactionManager(), null);
+    CollectionPreflightService.Ready ready = (CollectionPreflightService.Ready) service.get("user-1", "preflight-1");
+
+    assertThatThrownBy(() -> service.create("user-1", new CollectionPreflightService.CreateRequest(
+        "create-key-123", ready.planToken(), "session-b")))
+        .isInstanceOfSatisfying(ApiException.class,
+            error -> assertThat(error.code()).isEqualTo("GENERATION_SESSION_MISMATCH"));
+  }
+
+  private DreamSpaceProperties properties(String secret) {
+    return new DreamSpaceProperties(null, null, null, null, null, null,
+        new DreamSpaceProperties.Security(false, secret));
+  }
+
   private ResultSlotPlan slot(int index) {
     return new ResultSlotPlan(index, "方案 " + (index + 1), "VARIATION", "方案 " + (index + 1),
         List.of("方案 " + (index + 1)), List.of(), json.createObjectNode(), json.createObjectNode());

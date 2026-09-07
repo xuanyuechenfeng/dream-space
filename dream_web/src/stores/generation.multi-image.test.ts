@@ -84,7 +84,7 @@ describe("multi-image regeneration", () => {
     expect(preflight).not.toHaveProperty("sourceTaskId");
     expect(preflight).not.toHaveProperty("taskId");
     expect(api.generation.createFromPreflight).toHaveBeenCalledWith({
-      idempotencyKey: expect.any(String), planToken: "plan-token",
+      idempotencyKey: expect.any(String), planToken: "plan-token", sessionId: "session-1",
     });
     expect(store.active?.tasks.map(task => task.id)).toEqual(["task-2", "task-1"]);
   });

@@ -42,18 +42,25 @@ public class GenerationWorkerConfiguration {
   }
 
   @Bean
-  PlanningModel planningModel(@Qualifier("openAiChatModel") ChatModel chatModel, ObjectMapper json, ReferenceImageLoader references,
+  ResponsesPlanningClient responsesPlanningClient(OpenAiConnectionProperties connection,
+      OpenAiChatProperties chat) {
+    return new ResponsesPlanningClient(connection.getBaseUrl(), connection.getApiKey(),
+        chat.getOptions().getModel(), connection.getTimeout(), new ObjectMapper());
+  }
+
+  @Bean
+  PlanningModel planningModel(ObjectMapper json, ReferenceImageLoader references,
       DreamSpaceProperties properties, OpenAiConnectionProperties connection,
-      OpenAiChatProperties chat, WorkerMetrics metrics) {
+      OpenAiChatProperties chat, WorkerMetrics metrics, ResponsesPlanningClient responses) {
     requireStorageConfiguration(properties);
     DreamSpaceProperties.Planning planning = properties.ai().planning();
     if (!planning.enabled()) throw new IllegalStateException("AI_PLANNING_ENABLED must be true");
     requireValue(connection.getApiKey(), "AI_PLANNING_API_KEY");
     requireValue(connection.getBaseUrl(), "AI_PLANNING_BASE_URL");
     requireValue(chat.getOptions().getModel(), "AI_PLANNING_MODEL");
-    logModelConfiguration("planning", connection.getBaseUrl(), "/chat/completions", chat.getOptions().getModel(),
+    logModelConfiguration("planning", connection.getBaseUrl(), "/responses", chat.getOptions().getModel(),
         connection.getApiKey(), "openai-compatible");
-    return new ChatPlanningModel(chatModel, json, references, metrics, chat.getOptions().getModel());
+    return new ChatPlanningModel(responses, json, references, metrics, chat.getOptions().getModel());
   }
 
   @Bean
