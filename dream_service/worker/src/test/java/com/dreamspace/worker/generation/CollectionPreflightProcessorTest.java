@@ -281,6 +281,21 @@ class CollectionPreflightProcessorTest {
   }
 
   @Test
+  void acceptsEmptyOptionalContentScope() throws Exception {
+    givenPreflight("生成一张产品图片", 1);
+    ResultSlotPlan valid = slot(0, "总览", "VARIATION", "产品总览", "产品总览图");
+    givenProposal(proposal(CollectionMode.VARIATIONS,
+        new ResultSlotPlan(valid.index(), valid.label(), valid.role(), valid.intent(), List.of(),
+            valid.variationConstraints(), valid.prompt(), valid.acceptance())));
+
+    assertThat(processor.process("preflight-1")).isTrue();
+
+    ImageCollectionPlan plan = finishedPlan();
+    assertThat(plan.slots()).hasSize(1);
+    assertThat(plan.slots().getFirst().contentScope()).isEmpty();
+  }
+
+  @Test
   void rethrowsRetryablePlanningFailureBeforeLastQueueAttempt() {
     givenPreflight("生成一张产品总览", null);
     when(planning.collection(any(), any(), any(), any()))

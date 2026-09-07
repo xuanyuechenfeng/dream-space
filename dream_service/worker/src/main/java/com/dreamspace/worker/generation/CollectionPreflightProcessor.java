@@ -246,7 +246,7 @@ public class CollectionPreflightProcessor {
       if (slot == null || slot.index() < 0 || slot.index() >= slots.size()
           || !indexes.add(slot.index()) || !hasText(slot.label()) || !labels.add(slot.label())
           || !hasText(slot.role()) || !hasText(slot.intent())
-          || !hasNonBlankValues(slot.contentScope(), true)
+          || !hasNonBlankValues(slot.contentScope(), false)
           || !hasNonBlankValues(slot.variationConstraints(), false)
           || slot.prompt() == null || !slot.prompt().isObject() || slot.acceptance() == null || !slot.acceptance().isObject()) {
         throw new PlanValidationException("FAILED", "GENERATION_COLLECTION_PLAN_INVALID", "集合槽位字段不完整或索引不连续");

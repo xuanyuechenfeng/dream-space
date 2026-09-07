@@ -30,7 +30,7 @@ spring:
     # SMTP 登录账号，通常与 dream-space.email.from 一致。
     username: ${SPRING_MAIL_USERNAME:52517@qq.com}
     # SMTP 授权码/密码，禁止直接写入仓库。
-    password: ${SPRING_MAIL_PASSWORD:jpwlf}
+    password: ${SPRING_MAIL_PASSWORD:jpwlbf}
     properties:
       mail:
         smtp:
