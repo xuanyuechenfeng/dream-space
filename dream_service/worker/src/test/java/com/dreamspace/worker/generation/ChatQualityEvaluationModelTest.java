@@ -28,7 +28,7 @@ class ChatQualityEvaluationModelTest {
   private final ChatModel model = mock(ChatModel.class);
   private final ReferenceImageLoader references = mock(ReferenceImageLoader.class);
   private final ChatQualityEvaluationModel evaluator = new ChatQualityEvaluationModel(model, new ObjectMapper(), references,
-      new WorkerMetrics(new SimpleMeterRegistry(), properties()), "test-model");
+      new WorkerMetrics(new SimpleMeterRegistry(), properties()), "test-model", Duration.ofSeconds(321));
 
   @Test
   void normalizesObjectEvidenceIntoTheDocumentedStringArray() throws Exception {
@@ -46,7 +46,7 @@ class ChatQualityEvaluationModelTest {
   }
 
   @Test
-  void evaluatesCompatibilityEvidenceAndUsesNinetySecondDetectionTimeout() {
+  void evaluatesCompatibilityEvidenceAndUsesConfiguredTimeout() {
     when(model.call(any(Prompt.class))).thenReturn(response("""
         {"accepted":true,"score":0.95,"violations":[],"repairable":false,
          "evidence":{"technical":"valid"},"evaluatorVersion":"quality-v1"}
@@ -60,7 +60,7 @@ class ChatQualityEvaluationModelTest {
     var prompt = org.mockito.ArgumentCaptor.forClass(Prompt.class);
     verify(model).call(prompt.capture());
     assertThat(((OpenAiChatOptions) prompt.getValue().getOptions()).getTimeout())
-        .isEqualTo(Duration.ofSeconds(90));
+        .isEqualTo(Duration.ofSeconds(321));
   }
 
 

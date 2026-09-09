@@ -34,6 +34,12 @@ public final class PngImageWriter {
     return encode(decode(input, maxPixels), thumbnailMaxWidth);
   }
 
+  public NormalizedImage normalizeOriginal(byte[] input, long maxPixels) {
+    BufferedImage output = decode(input, maxPixels);
+    byte[] encoded = encode(output);
+    return new NormalizedImage(encoded, output.getWidth(), output.getHeight(), sha256(encoded));
+  }
+
   private static EncodedImage encode(BufferedImage output, int thumbnailMaxWidth) {
     int width = output.getWidth();
     int height = output.getHeight();
@@ -96,4 +102,6 @@ public final class PngImageWriter {
 
   public record EncodedImage(byte[] data, int width, int height, byte[] thumbnail, int thumbnailWidth,
       int thumbnailHeight, String checksumSha256) {}
+
+  public record NormalizedImage(byte[] data, int width, int height, String checksumSha256) {}
 }

@@ -2,9 +2,9 @@ package com.dreamspace.api.controller;
 
 import com.dreamspace.api.common.AdminPermission;
 import com.dreamspace.api.common.AdminPermissions;
+import com.dreamspace.api.common.ImageResponseSupport;
 import com.dreamspace.api.service.AdminTasksService;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,11 +32,15 @@ public class AdminTasksController {
 
   @GetMapping("/results/{resultId}/content")
   @AdminPermission(AdminPermissions.TASKS_READ)
-  ResponseEntity<byte[]> content(@PathVariable String resultId) { return binary(resultId, false); }
+  ResponseEntity<byte[]> content(@PathVariable String resultId, HttpServletRequest request) {
+    return binary(resultId, false, request);
+  }
 
   @GetMapping("/results/{resultId}/thumbnail")
   @AdminPermission(AdminPermissions.TASKS_READ)
-  ResponseEntity<byte[]> thumbnail(@PathVariable String resultId) { return binary(resultId, true); }
+  ResponseEntity<byte[]> thumbnail(@PathVariable String resultId, HttpServletRequest request) {
+    return binary(resultId, true, request);
+  }
 
   @GetMapping("/reconciliation/runs")
   @AdminPermission(AdminPermissions.TASKS_READ)
@@ -46,13 +50,10 @@ public class AdminTasksController {
   @AdminPermission(AdminPermissions.TASKS_READ)
   AdminTasksService.TaskDetail detail(@PathVariable String taskId) { return service.get(taskId); }
 
-  private ResponseEntity<byte[]> binary(String resultId, boolean thumbnail) {
+  private ResponseEntity<byte[]> binary(String resultId, boolean thumbnail, HttpServletRequest request) {
     var data = service.readResult(resultId, thumbnail);
-    String extension = data.contentType().toLowerCase().endsWith("png") ? "png" : "webp";
-    return ResponseEntity.ok().contentType(MediaType.parseMediaType(data.contentType()))
-        .contentLength(data.bytes().length)
-        .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"generation-result." + extension + "\"")
-        .header(HttpHeaders.CACHE_CONTROL, "private, max-age=3600")
-        .header("X-Content-Type-Options", "nosniff").body(data.bytes());
+    String contentType = data.contentType() == null ? "" : data.contentType().toLowerCase();
+    String extension = contentType.endsWith("png") ? "png" : "webp";
+    return ImageResponseSupport.inline(data, request, "generation-result." + extension);
   }
 }

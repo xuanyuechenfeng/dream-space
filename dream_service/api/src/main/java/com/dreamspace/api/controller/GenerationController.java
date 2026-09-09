@@ -1,13 +1,13 @@
 package com.dreamspace.api.controller;
 
 import com.dreamspace.api.common.ApiException;
+import com.dreamspace.api.common.ImageResponseSupport;
 import com.dreamspace.api.common.CookieSupport;
 import com.dreamspace.api.service.AuthService;
 import com.dreamspace.api.service.GenerationService;
 import com.dreamspace.api.service.CollectionPreflightService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -130,18 +130,19 @@ public class GenerationController {
   }
 
   @GetMapping("/results/{resultId}/content")
-  ResponseEntity<byte[]> content(@PathVariable String resultId, HttpServletRequest request) { return binary(user(request), resultId, false); }
+  ResponseEntity<byte[]> content(@PathVariable String resultId, HttpServletRequest request) {
+    return binary(user(request), resultId, false, request);
+  }
 
   @GetMapping("/results/{resultId}/thumbnail")
-  ResponseEntity<byte[]> thumbnail(@PathVariable String resultId, HttpServletRequest request) { return binary(user(request), resultId, true); }
+  ResponseEntity<byte[]> thumbnail(@PathVariable String resultId, HttpServletRequest request) {
+    return binary(user(request), resultId, true, request);
+  }
 
-  private ResponseEntity<byte[]> binary(String userId, String resultId, boolean thumbnail) {
+  private ResponseEntity<byte[]> binary(String userId, String resultId, boolean thumbnail,
+      HttpServletRequest request) {
     var data = service.result(userId, resultId, thumbnail);
-    String contentType = data.contentType() == null || data.contentType().isBlank()
-        ? MediaType.APPLICATION_OCTET_STREAM_VALUE : data.contentType();
-    return ResponseEntity.ok().contentType(MediaType.parseMediaType(contentType)).contentLength(data.bytes().length)
-        .header(HttpHeaders.CONTENT_DISPOSITION, "inline").header(HttpHeaders.CACHE_CONTROL, "private, no-store")
-        .header("X-Content-Type-Options", "nosniff").body(data.bytes());
+    return ImageResponseSupport.inline(data, request, null);
   }
 
   private String user(HttpServletRequest request) {

@@ -28,9 +28,9 @@ spring:
     # 常用端口：465（SSL）或 587（STARTTLS）。
     port: ${SPRING_MAIL_PORT:465}
     # SMTP 登录账号，通常与 dream-space.email.from 一致。
-    username: ${SPRING_MAIL_USERNAME:52517@qq.com}
+    username: ${SPRING_MAIL_USERNAME:52535@qq.com}
     # SMTP 授权码/密码，禁止直接写入仓库。
-    password: ${SPRING_MAIL_PASSWORD:jpwhbf}
+    password: ${SPRING_MAIL_PASSWORD:jpwbf}
     properties:
       mail:
         smtp:

@@ -2,6 +2,7 @@ package com.dreamspace.worker.generation;
 
 import com.dreamspace.common.image.ImageProcessingException;
 import com.dreamspace.common.image.PngImageWriter;
+import com.dreamspace.common.image.WebpImageWriter;
 import com.dreamspace.common.persistence.storage.ObjectStorage;
 import com.dreamspace.worker.observability.WorkerMetrics;
 import java.util.ArrayList;
@@ -17,13 +18,21 @@ import org.slf4j.LoggerFactory;
 public class GenerationOutputPipeline {
   private static final Logger log = LoggerFactory.getLogger(GenerationOutputPipeline.class);
   private static final String PNG_MIME = "image/png";
+  private static final String WEBP_MIME = "image/webp";
+  private static final int PREVIEW_MAX_EDGE = 640;
+  private static final int PREVIEW_TARGET_BYTES = 150 * 1024;
+  private static final float PREVIEW_QUALITY = 0.80f;
+  private static final long MAX_PIXELS = 40_000_000L;
   private final ObjectStorage storage;
   private final PngImageWriter png;
+  private final WebpImageWriter webp;
   private final WorkerMetrics metrics;
 
-  public GenerationOutputPipeline(ObjectStorage storage, PngImageWriter png, WorkerMetrics metrics) {
+  public GenerationOutputPipeline(ObjectStorage storage, PngImageWriter png, WebpImageWriter webp,
+      WorkerMetrics metrics) {
     this.storage = storage;
     this.png = png;
+    this.webp = webp;
     this.metrics = metrics;
   }
 
@@ -54,32 +63,43 @@ public class GenerationOutputPipeline {
   }
 
   private StoredGenerationResult persistOne(WorkerTaskSnapshot task, ProviderImage image) {
-    PngImageWriter.EncodedImage encoded;
+    PngImageWriter.NormalizedImage original;
+    WebpImageWriter.EncodedPreview preview;
     try {
-      encoded = png.normalize(image.data(), 480, 40_000_000L);
+      original = png.normalizeOriginal(image.data(), MAX_PIXELS);
+      long previewStarted = metrics.startImageProcessing();
+      try {
+        preview = webp.preview(image.data(), PREVIEW_MAX_EDGE, PREVIEW_QUALITY, MAX_PIXELS);
+      } finally {
+        metrics.recordPreviewEncoding(previewStarted);
+      }
     } catch (ImageProcessingException error) {
       throw new GenerationProviderException(error.code(), "provider image processing failed", false, error);
     }
-    byte[] output = encoded.data();
-    byte[] thumbnail = encoded.thumbnail();
-    int thumbnailWidth = encoded.thumbnailWidth();
-    int thumbnailHeight = encoded.thumbnailHeight();
+    byte[] output = original.data();
+    byte[] thumbnail = preview.data();
 
     String resultId = UUID.randomUUID().toString();
     String objectKey = "results/" + task.id() + "/" + resultId + ".png";
-    String thumbnailObjectKey = "thumbnails/" + task.id() + "/" + resultId + ".png";
+    String thumbnailObjectKey = "thumbnails/" + task.id() + "/" + resultId + "-v2.webp";
     storage.put(objectKey, output, PNG_MIME);
     try {
-      storage.put(thumbnailObjectKey, thumbnail, PNG_MIME);
+      storage.put(thumbnailObjectKey, thumbnail, WEBP_MIME);
     } catch (RuntimeException error) {
       deleteQuietly(thumbnailObjectKey);
       deleteQuietly(objectKey);
       throw error;
     }
+    metrics.recordPreview(output.length, thumbnail.length);
+    if (thumbnail.length > PREVIEW_TARGET_BYTES) {
+      log.atWarn().addKeyValue("taskId", task.id()).addKeyValue("resultId", resultId)
+          .addKeyValue("previewBytes", thumbnail.length).addKeyValue("targetBytes", PREVIEW_TARGET_BYTES)
+          .log("generated preview exceeds target size");
+    }
     return new StoredGenerationResult(resultId, image.index(),
         "/dream_web/generation/results/" + resultId + "/content", objectKey, thumbnailObjectKey,
-        encoded.checksumSha256(), encoded.width(), encoded.height(), PNG_MIME, output.length,
-        thumbnailWidth, thumbnailHeight, thumbnail.length);
+        original.checksumSha256(), original.width(), original.height(), PNG_MIME, output.length,
+        preview.width(), preview.height(), thumbnail.length);
   }
 
   private static void validateProviderOutput(WorkerTaskSnapshot task, List<ProviderImage> images) {

@@ -213,8 +213,24 @@ public class GenerationV2SlotProcessor {
                   "attempt", attempt.number(), "iteration", iteration, "reason", "final_quality_iteration")));
           break;
         }
-        QualityEvaluationModel.EvaluationResult evaluation = quality.evaluate(snapshot,
-            new GenerationPlanBundle(null, null, null, prompt), List.of(image), iteration);
+        QualityEvaluationModel.EvaluationResult evaluation;
+        try {
+          evaluation = quality.evaluate(snapshot,
+              new GenerationPlanBundle(null, null, null, prompt), List.of(image), iteration);
+        } catch (RuntimeException error) {
+          String errorCode = error instanceof GenerationProviderException provider
+              ? provider.code() : "QUALITY_EVALUATION_FAILED";
+          log.atWarn().addKeyValue("taskId", task.id()).addKeyValue("executionId", executionId)
+              .addKeyValue("slotIndex", slot.index()).addKeyValue("iteration", iteration)
+              .addKeyValue("errorCode", errorCode)
+              .addKeyValue("exceptionType", error.getClass().getSimpleName())
+              .log("quality evaluation failed; candidate will continue without quality gate", error);
+          v2.insertTaskEvent(task.id(), "task.slot.quality_skipped", "GENERATING",
+              json(java.util.Map.of("executionId", executionId, "slotIndex", slot.index(),
+                  "attempt", attempt.number(), "iteration", iteration,
+                  "reason", "evaluation_failed", "errorCode", errorCode)));
+          break;
+        }
         EvaluationReport report = evaluation == null ? null : evaluation.report();
         if (report == null) throw new GenerationProviderException("EVALUATION_OUTPUT_INVALID", "slot quality evaluator returned no report", false);
         if (report.accepted() && report.score() >= acceptScore) break;

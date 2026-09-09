@@ -73,9 +73,9 @@ public class GenerationWorkerConfiguration {
   @Bean
   QualityEvaluationModel qualityEvaluationModel(@Qualifier("detectionChatModel") ChatModel chatModel,
       ObjectMapper json, ReferenceImageLoader references, WorkerMetrics metrics,
-      OpenAiChatProperties chat) {
+      OpenAiChatProperties chat, OpenAiConnectionProperties connection) {
     return new ChatQualityEvaluationModel(chatModel, json, references, metrics,
-        chat.getOptions().getModel());
+        chat.getOptions().getModel(), connection.getTimeout());
   }
 
   @Bean

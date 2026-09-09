@@ -375,6 +375,52 @@ class GenerationV2SlotProcessorTest {
   }
 
   @Test
+  void qualityEvaluationFailureSkipsTheGateAndStillPublishesTheCandidate() {
+    GenerationV2SlotProcessor qualityProcessor = new GenerationV2SlotProcessor(
+        generation, v2, settlement, imageModel, output, moderator, json, quality, 3, 0.8);
+    GenerationAttempt attempt = new GenerationAttempt(EXECUTION_ID + ":1", 1, 3);
+    givenExecution(List.of(0), 2, List.of(slotRecord(0, GenerationSlotStatus.WAITING, null)));
+    StoredGenerationResult result = stored(0);
+    when(imageModel.generate(any(), eq(attempt))).thenReturn(response());
+    when(quality.evaluate(any(), any(), any(), eq(1)))
+        .thenThrow(new GenerationProviderException("EVALUATION_TEMPORARILY_UNAVAILABLE", "timeout", true));
+    when(output.persist(any(), any())).thenReturn(List.of(result));
+    when(settlement.publishSlot(EXECUTION_ID, TASK_ID, 0, result, 2)).thenReturn(true);
+    when(settlement.completeExecution(EXECUTION_ID, TASK_ID, 1)).thenReturn(true);
+
+    assertThat(qualityProcessor.process(EXECUTION_ID, attempt).status())
+        .isEqualTo(GenerationProcessor.Status.SUCCEEDED);
+
+    verify(imageModel).generate(any(), eq(attempt));
+    verify(moderator).moderateOutput(any(), any());
+    verify(output).persist(any(), any());
+    verify(settlement).publishSlot(EXECUTION_ID, TASK_ID, 0, result, 2);
+    verify(settlement, never()).recordSlotFailure(anyString(), anyString(), anyInt(), anyString(), anyString());
+    verify(v2).insertTaskEvent(eq(TASK_ID), eq("task.slot.quality_skipped"), eq("GENERATING"), anyString());
+  }
+
+  @Test
+  void unexpectedQualityEvaluationFailureAlsoAllowsTheCandidateToProceed() {
+    GenerationV2SlotProcessor qualityProcessor = new GenerationV2SlotProcessor(
+        generation, v2, settlement, imageModel, output, moderator, json, quality, 3, 0.8);
+    GenerationAttempt attempt = new GenerationAttempt(EXECUTION_ID + ":1", 1, 3);
+    givenExecution(List.of(0), 2, List.of(slotRecord(0, GenerationSlotStatus.WAITING, null)));
+    StoredGenerationResult result = stored(0);
+    when(imageModel.generate(any(), eq(attempt))).thenReturn(response());
+    when(quality.evaluate(any(), any(), any(), eq(1))).thenThrow(new IllegalStateException("unexpected"));
+    when(output.persist(any(), any())).thenReturn(List.of(result));
+    when(settlement.publishSlot(EXECUTION_ID, TASK_ID, 0, result, 2)).thenReturn(true);
+    when(settlement.completeExecution(EXECUTION_ID, TASK_ID, 1)).thenReturn(true);
+
+    assertThat(qualityProcessor.process(EXECUTION_ID, attempt).status())
+        .isEqualTo(GenerationProcessor.Status.SUCCEEDED);
+
+    verify(settlement).publishSlot(EXECUTION_ID, TASK_ID, 0, result, 2);
+    verify(settlement, never()).recordSlotFailure(anyString(), anyString(), anyInt(), anyString(), anyString());
+    verify(v2).insertTaskEvent(eq(TASK_ID), eq("task.slot.quality_skipped"), eq("GENERATING"), anyString());
+  }
+
+  @Test
   void exhaustedDeliveryFailsItsActiveSlotThroughV2Settlement() {
     GenerationExecutionRecord execution = new GenerationExecutionRecord(EXECUTION_ID, TASK_ID,
         GenerationExecutionKind.INITIAL, GenerationExecutionStatus.GENERATING, "execution-key",

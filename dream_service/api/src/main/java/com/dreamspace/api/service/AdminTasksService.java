@@ -102,9 +102,11 @@ public class AdminTasksService {
     GenerationResultRecord result = mapper.findResult(requiredId(resultId));
     if (result == null) throw notFound("生成结果不存在");
     String key = thumbnail ? result.thumbnailObjectKey() : result.objectKey();
-    if (key == null || key.isBlank()) key = result.imagePath();
+    if (thumbnail && (key == null || key.isBlank())) throw notFound("预览图不存在");
+    if (!thumbnail && (key == null || key.isBlank())) key = result.imagePath();
     try {
-      return storage.selected().get(key).orElseThrow(() -> notFound("生成结果不存在"));
+      return storage.selected().get(key)
+          .orElseThrow(() -> notFound(thumbnail ? "预览图不存在" : "生成结果不存在"));
     } catch (IllegalArgumentException invalidKey) {
       throw notFound("生成结果不存在");
     }
@@ -120,7 +122,9 @@ public class AdminTasksService {
 
   private Result result(GenerationResultRecord result) {
     String base = "/manage_web/tasks/results/" + result.id();
-    return new Result(result.id(), result.index(), base + "/content", base + "/thumbnail",
+    int version = java.util.Objects.hash(result.thumbnailObjectKey(), result.thumbnailByteSize());
+    return new Result(result.id(), result.index(), base + "/content", base + "/thumbnail?v="
+        + Integer.toUnsignedString(version, 36),
         result.width(), result.height(), result.mimeType(), result.byteSize(), result.isAiGenerated(),
         value(result.moderationStatus()));
   }

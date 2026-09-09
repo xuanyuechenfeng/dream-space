@@ -4,6 +4,8 @@ import static com.dreamspace.common.persistence.database.DatabaseEnums.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.dreamspace.api.common.ApiException;
@@ -51,5 +53,20 @@ class AdminTasksServiceTest {
     assertThatThrownBy(() -> service.readResult("result-1", false))
         .isInstanceOfSatisfying(ApiException.class,
             error -> assertThat(error.status().value()).isEqualTo(404));
+  }
+
+  @Test
+  void missingThumbnailNeverFallsBackToOriginalImagePath() {
+    AdminApplicationMapper mapper = mock(AdminApplicationMapper.class);
+    ObjectStorage objectStorage = mock(ObjectStorage.class);
+    when(mapper.findResult("result-1")).thenReturn(new GenerationResultRecord("result-1", "task-1", 0,
+        "results/task-1/result-1.png", "results/task-1/result-1.png", null, "sum", 10, 10,
+        "image/png", 10, null, null, null, ModerationStatus.APPROVED, true, Instant.now()));
+    AdminTasksService service = new AdminTasksService(mapper, new ObjectStorageFactory(objectStorage));
+
+    assertThatThrownBy(() -> service.readResult("result-1", true))
+        .isInstanceOfSatisfying(ApiException.class,
+            error -> assertThat(error.status().value()).isEqualTo(404));
+    verify(objectStorage, never()).get("results/task-1/result-1.png");
   }
 }

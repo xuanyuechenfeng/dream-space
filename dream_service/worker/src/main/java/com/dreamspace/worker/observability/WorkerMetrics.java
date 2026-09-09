@@ -3,6 +3,7 @@ package com.dreamspace.worker.observability;
 import com.dreamspace.common.persistence.config.DreamSpaceProperties;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.util.concurrent.atomic.AtomicLong;
@@ -15,6 +16,13 @@ public final class WorkerMetrics {
   private final AtomicLong moderationPending = new AtomicLong();
   private final AtomicLong reconciliationBlocked = new AtomicLong();
   private final String storageMode;
+  private final DistributionSummary previewBytes;
+  private final DistributionSummary previewRatio;
+  private final Timer previewEncoding;
+  private final Counter previewBackfillProcessed;
+  private final Counter previewBackfillSucceeded;
+  private final Counter previewBackfillFailed;
+  private final Counter previewBackfillSkipped;
 
   public WorkerMetrics(MeterRegistry registry, DreamSpaceProperties properties) {
     this.registry = registry;
@@ -28,6 +36,17 @@ public final class WorkerMetrics {
         .tag("stage", "worker").register(registry);
     Gauge.builder("dreamspace_quota_reconciliation_blocked_total", reconciliationBlocked, AtomicLong::get)
         .description("Quota reconciliation findings that remain BLOCKED").tag("reason", "any").register(registry);
+    previewBytes = DistributionSummary.builder("dreamspace_generation_preview_bytes")
+        .description("Encoded generated-result preview size in bytes").register(registry);
+    previewRatio = DistributionSummary.builder("dreamspace_generation_preview_ratio")
+        .description("Preview bytes divided by original bytes").register(registry);
+    previewEncoding = Timer.builder("dreamspace_image_processing_duration_seconds")
+        .description("Generated-result preview encoding duration")
+        .tag("operation", "preview_encode").publishPercentileHistogram().register(registry);
+    previewBackfillProcessed = backfillCounter(registry, "processed");
+    previewBackfillSucceeded = backfillCounter(registry, "succeeded");
+    previewBackfillFailed = backfillCounter(registry, "failed");
+    previewBackfillSkipped = backfillCounter(registry, "skipped");
   }
 
   public void pending(long value) { pending.set(Math.max(0, value)); }
@@ -60,6 +79,25 @@ public final class WorkerMetrics {
     Timer.builder("dreamspace_image_processing_duration_seconds")
         .tag("operation", safe(operation)).publishPercentileHistogram().register(registry)
         .record(System.nanoTime() - startedNanos, java.util.concurrent.TimeUnit.NANOSECONDS);
+  }
+  public void recordPreview(int originalBytes, int previewBytes) {
+    this.previewBytes.record(previewBytes);
+    if (originalBytes > 0) previewRatio.record((double) previewBytes / originalBytes);
+  }
+  public void recordPreviewEncoding(long startedNanos) {
+    previewEncoding.record(System.nanoTime() - startedNanos, java.util.concurrent.TimeUnit.NANOSECONDS);
+  }
+  public void recordPreviewBackfill(int processed, int succeeded, int failed, int skipped) {
+    previewBackfillProcessed.increment(Math.max(0, processed));
+    previewBackfillSucceeded.increment(Math.max(0, succeeded));
+    previewBackfillFailed.increment(Math.max(0, failed));
+    previewBackfillSkipped.increment(Math.max(0, skipped));
+  }
+
+  private static Counter backfillCounter(MeterRegistry registry, String outcome) {
+    return Counter.builder("dreamspace_generation_preview_backfill_total")
+        .description("Historical generated-result preview backfill outcomes")
+        .tag("outcome", outcome).register(registry);
   }
 
   private static String safe(String value) {

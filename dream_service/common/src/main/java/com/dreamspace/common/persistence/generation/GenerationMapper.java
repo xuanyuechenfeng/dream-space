@@ -63,6 +63,25 @@ public interface GenerationMapper {
   List<GenerationResultSlotRecord> listResultSlots(String taskId);
   @Select("SELECT r.* FROM \"GenerationResult\" r JOIN \"GenerationTask\" t ON t.\"id\" = r.\"taskId\" WHERE r.\"id\" = #{resultId} AND t.\"userId\" = #{userId} LIMIT 1")
   GenerationResultRecord findOwnedResult(@Param("userId") String userId, @Param("resultId") String resultId);
+  @Select("SELECT * FROM \"GenerationResult\" WHERE \"id\" = #{resultId} LIMIT 1")
+  GenerationResultRecord findResult(String resultId);
+  @Select("<script>SELECT * FROM \"GenerationResult\" WHERE \"objectKey\" IS NOT NULL "
+      + "AND (\"thumbnailObjectKey\" IS NULL OR LOWER(\"thumbnailObjectKey\") NOT LIKE '%.webp' "
+      + "OR \"thumbnailWidth\" IS NULL OR \"thumbnailWidth\" &lt;= 0 "
+      + "OR \"thumbnailHeight\" IS NULL OR \"thumbnailHeight\" &lt;= 0 "
+      + "OR \"thumbnailByteSize\" IS NULL OR \"thumbnailByteSize\" &lt;= 0 "
+      + "OR GREATEST(\"thumbnailWidth\",\"thumbnailHeight\") &gt; #{maxEdge}) "
+      + "<if test='afterId != null and afterId != &quot;&quot;'>AND \"id\" &gt; #{afterId} </if>"
+      + "ORDER BY \"id\" ASC LIMIT #{limit}</script>")
+  List<GenerationResultRecord> listPreviewBackfillCandidates(@Param("afterId") String afterId,
+      @Param("limit") int limit, @Param("maxEdge") int maxEdge);
+  @Update("UPDATE \"GenerationResult\" SET \"thumbnailObjectKey\"=#{newKey},"
+      + "\"thumbnailWidth\"=#{width},\"thumbnailHeight\"=#{height},"
+      + "\"thumbnailByteSize\"=#{byteSize} WHERE \"id\"=#{id} "
+      + "AND \"thumbnailObjectKey\" IS NOT DISTINCT FROM #{expectedKey}")
+  int replacePreview(@Param("id") String id, @Param("expectedKey") String expectedKey,
+      @Param("newKey") String newKey, @Param("width") int width,
+      @Param("height") int height, @Param("byteSize") int byteSize);
   @Select("SELECT * FROM \"GenerationTaskEvent\" WHERE \"taskId\" = #{taskId} AND \"id\" > #{afterId} ORDER BY \"id\" ASC LIMIT #{limit}")
   List<GenerationTaskEventRecord> listEvents(@Param("taskId") String taskId, @Param("afterId") long afterId, @Param("limit") int limit);
 

@@ -33,6 +33,21 @@ public final class WebpImageWriter {
         null, 0, 0);
   }
 
+  public EncodedPreview preview(byte[] input, int maxEdge, float quality, long maxPixels) {
+    if (maxEdge < 1) throw new IllegalArgumentException("maxEdge must be positive");
+    if (quality <= 0 || quality > 1) throw new IllegalArgumentException("quality must be in (0, 1]");
+    BufferedImage oriented = decodeAndOrient(input, maxPixels);
+    int longestEdge = Math.max(oriented.getWidth(), oriented.getHeight());
+    double scale = Math.min(1.0, (double) maxEdge / longestEdge);
+    int width = Math.max(1, (int) Math.round(oriented.getWidth() * scale));
+    int height = Math.max(1, (int) Math.round(oriented.getHeight() * scale));
+    BufferedImage output = width == oriented.getWidth() && height == oriented.getHeight()
+        ? oriented : resize(oriented, width, height);
+    byte[] encoded = encode(output, quality);
+    verify(encoded);
+    return new EncodedPreview(encoded, width, height);
+  }
+
   public EncodedImage cover(byte[] input, int width, int height, int thumbnailMaxWidth,
       long maxPixels) {
     if (width < 1 || height < 1 || thumbnailMaxWidth < 1) {
@@ -191,6 +206,8 @@ public final class WebpImageWriter {
 
   public record EncodedImage(byte[] data, int width, int height, String checksumSha256,
       byte[] thumbnail, int thumbnailWidth, int thumbnailHeight) {}
+
+  public record EncodedPreview(byte[] data, int width, int height) {}
 
   private static final class ExifOrientation {
     private ExifOrientation() {}

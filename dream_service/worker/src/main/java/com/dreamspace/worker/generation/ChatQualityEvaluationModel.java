@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -35,14 +36,19 @@ public final class ChatQualityEvaluationModel implements QualityEvaluationModel 
   private final ReferenceImageLoader references;
   private final WorkerMetrics metrics;
   private final String modelName;
+  private final Duration timeout;
 
   public ChatQualityEvaluationModel(ChatModel model, ObjectMapper json, ReferenceImageLoader references,
-      WorkerMetrics metrics, String modelName) {
+      WorkerMetrics metrics, String modelName, Duration timeout) {
     this.model = model;
     this.json = json.copy().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     this.references = references;
     this.metrics = metrics;
     this.modelName = modelName;
+    if (timeout == null || timeout.isNegative() || timeout.isZero()) {
+      throw new IllegalArgumentException("quality evaluation timeout must be positive");
+    }
+    this.timeout = timeout;
   }
 
   @Override
@@ -84,7 +90,7 @@ public final class ChatQualityEvaluationModel implements QualityEvaluationModel 
       log.atError().addKeyValue("taskId", task.id()).addKeyValue("iteration", iteration)
           .addKeyValue("errorCode", "EVALUATION_OUTPUT_INVALID")
           .addKeyValue("exceptionType", error.getClass().getSimpleName())
-          .log("quality evaluation model response could not be parsed", error);
+          .log("quality evaluation model failed", error);
       throw new GenerationProviderException("EVALUATION_OUTPUT_INVALID",
           "quality evaluator output is invalid", false, error);
     } finally {
@@ -108,7 +114,7 @@ public final class ChatQualityEvaluationModel implements QualityEvaluationModel 
     for (String imageId : task.imageIds()) addReference(media, task, imageId, "input-image-" + index++);
     var response = model.call(new Prompt(List.of(new SystemMessage(SYSTEM),
         UserMessage.builder().text(text).media(media).build()),
-        OpenAiChatOptions.builder().timeout(ModelTimeouts.DETECTION).build()));
+        OpenAiChatOptions.builder().timeout(timeout).build()));
     String responseText = response == null || response.getResult() == null || response.getResult().getOutput() == null
         ? null : response.getResult().getOutput().getText();
     String responsePreview = preview(responseText);

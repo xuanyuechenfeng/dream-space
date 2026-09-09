@@ -1,0 +1,2 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verify quality-loop behavior and provider error handling against backend rules."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Verify structured logging and sensitive-data constraints."}

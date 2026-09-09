@@ -1,4 +1,4 @@
-const IMAGE_CACHE_NAME = "dream-space-images-v1";
+const IMAGE_CACHE_NAME = "dream-space-images-v2";
 const pendingImages = new Map<string, Promise<Blob | null>>();
 
 export interface CachedImageSource {

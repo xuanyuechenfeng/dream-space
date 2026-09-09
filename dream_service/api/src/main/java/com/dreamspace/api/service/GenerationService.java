@@ -300,8 +300,18 @@ public class GenerationService {
     GenerationResultRecord result = mapper.findOwnedResult(userId, resultId);
     if (result == null) throw badNotFound();
     String key = thumbnail ? result.thumbnailObjectKey() : result.objectKey();
-    if (key == null || key.isBlank()) key = result.imagePath();
-    return storage.selected().get(key).orElseThrow(GenerationService::badNotFound);
+    if (thumbnail && (key == null || key.isBlank())) {
+      throw new ApiException(HttpStatus.NOT_FOUND, "THUMBNAIL_NOT_FOUND", "预览图不存在");
+    }
+    if (!thumbnail && (key == null || key.isBlank())) key = result.imagePath();
+    try {
+      return storage.selected().get(key).orElseThrow(() -> thumbnail
+          ? new ApiException(HttpStatus.NOT_FOUND, "THUMBNAIL_NOT_FOUND", "预览图不存在")
+          : badNotFound());
+    } catch (IllegalArgumentException invalidKey) {
+      if (thumbnail) throw new ApiException(HttpStatus.NOT_FOUND, "THUMBNAIL_NOT_FOUND", "预览图不存在");
+      throw badNotFound();
+    }
   }
 
   public SseEmitter events(String userId, String taskId, long afterId) {
@@ -445,7 +455,7 @@ public class GenerationService {
     List<GenerationTaskRecord> tasks = mapper.listTasks(session.id());
     if (!tasks.isEmpty()) {
       List<GenerationResultRecord> results = mapper.listResults(tasks.get(0).id());
-      if (!results.isEmpty()) thumbnail = "/dream_web/generation/results/" + results.get(0).id() + "/thumbnail";
+      if (!results.isEmpty()) thumbnail = thumbnailUrl(results.get(0));
     }
     return new SessionSummary(session.id(), session.title(), thumbnail, session.createdAt(), session.updatedAt());
   }
@@ -469,7 +479,7 @@ public class GenerationService {
 
   private TaskView taskView(GenerationTaskRecord task) {
     List<ResultView> results = mapper.listResults(task.id()).stream().map(result -> new ResultView(result.id(), result.index(),
-        "/dream_web/generation/results/" + result.id() + "/content", "/dream_web/generation/results/" + result.id() + "/thumbnail",
+        "/dream_web/generation/results/" + result.id() + "/content", thumbnailUrl(result),
         result.width(), result.height(), result.mimeType(), result.byteSize(), result.isAiGenerated(),
         apiValue(result.moderationStatus()))).toList();
     List<String> refs = imageIds(task);
@@ -496,6 +506,12 @@ public class GenerationService {
         task.startedAt(), task.completedAt(), task.createdAt(), task.updatedAt(), plan == null ? null : apiValue(plan.status()),
         stage, latest == null ? 0 : latest.iteration(), score, results, consumed, successful,
         Math.max(0, task.imageCount() - successful), plan == null ? null : apiValue(plan.collectionMode()), slots);
+  }
+
+  private static String thumbnailUrl(GenerationResultRecord result) {
+    int version = java.util.Objects.hash(result.thumbnailObjectKey(), result.thumbnailByteSize());
+    return "/dream_web/generation/results/" + result.id() + "/thumbnail?v="
+        + Integer.toUnsignedString(version, 36);
   }
 
   public SubmitResponse continueMissing(String userId, String taskId, String idempotencyKey) {

@@ -143,7 +143,10 @@ class GenerationServiceTest {
     var result = service.getTask("user-1", "task-1");
 
     assertThat(result.status()).isEqualTo("queued");
-    assertThat(result.results()).singleElement().satisfies(item -> assertThat(item.moderationStatus()).isEqualTo("approved"));
+    assertThat(result.results()).singleElement().satisfies(item -> {
+      assertThat(item.moderationStatus()).isEqualTo("approved");
+      assertThat(item.thumbnailUrl()).startsWith("/dream_web/generation/results/result-1/thumbnail?v=");
+    });
   }
 
   @Test
@@ -159,6 +162,24 @@ class GenerationServiceTest {
     GenerationService service = service(mock(GenerationMapper.class), mock(QuotaTransactionService.class),
         mock(GenerationQueuePublisher.class), new TestTransactionManager(), new ObjectMapper());
     assertThat(service.options().modes()).containsExactly("AUTO");
+  }
+
+  @Test
+  void missingThumbnailNeverFallsBackToOriginalImagePath() {
+    GenerationMapper mapper = mock(GenerationMapper.class);
+    ObjectStorage objectStorage = mock(ObjectStorage.class);
+    when(mapper.findOwnedResult("user-1", "result-1")).thenReturn(
+        new com.dreamspace.common.persistence.generation.GenerationResultRecord(
+            "result-1", "task-1", 0, "results/task-1/result-1.png",
+            "results/task-1/result-1.png", null, "checksum", 100, 100, "image/png", 100,
+            null, null, null, ModerationStatus.APPROVED, true, Instant.EPOCH));
+    GenerationService service = service(mapper, mock(QuotaTransactionService.class),
+        mock(GenerationQueuePublisher.class), new TestTransactionManager(), new ObjectMapper(), objectStorage);
+
+    assertThatThrownBy(() -> service.result("user-1", "result-1", true))
+        .isInstanceOfSatisfying(ApiException.class,
+            error -> assertThat(error.code()).isEqualTo("THUMBNAIL_NOT_FOUND"));
+    verify(objectStorage, never()).get("results/task-1/result-1.png");
   }
 
   @Test
@@ -234,8 +255,14 @@ class GenerationServiceTest {
 
   private static GenerationService service(GenerationMapper mapper, QuotaTransactionService quota,
       GenerationQueuePublisher publisher, TestTransactionManager transactions, ObjectMapper json) {
+    return service(mapper, quota, publisher, transactions, json, mock(ObjectStorage.class));
+  }
+
+  private static GenerationService service(GenerationMapper mapper, QuotaTransactionService quota,
+      GenerationQueuePublisher publisher, TestTransactionManager transactions, ObjectMapper json,
+      ObjectStorage storage) {
     DreamSpaceProperties properties = new DreamSpaceProperties(null, null, null, null, null);
-    return new GenerationService(mapper, quota, publisher, new ObjectStorageFactory(mock(ObjectStorage.class)),
+    return new GenerationService(mapper, quota, publisher, new ObjectStorageFactory(storage),
         properties, json, transactions, mock(ReferenceUploadMapper.class));
   }
 

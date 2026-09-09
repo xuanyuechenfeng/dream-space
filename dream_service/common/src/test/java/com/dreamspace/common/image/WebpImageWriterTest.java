@@ -41,4 +41,47 @@ class WebpImageWriterTest {
     assertThat(ImageIO.read(new java.io.ByteArrayInputStream(result.data()))).isNotNull();
     assertThat(ImageIO.read(new java.io.ByteArrayInputStream(result.thumbnail()))).isNotNull();
   }
+
+  @Test
+  void createsProportionalLandscapePreviewUsingLongestEdge() throws Exception {
+    byte[] input = png(1600, 900);
+
+    WebpImageWriter.EncodedPreview result = new WebpImageWriter()
+        .preview(input, 640, 0.80f, 2_000_000);
+
+    assertThat(result.width()).isEqualTo(640);
+    assertThat(result.height()).isEqualTo(360);
+    assertThat(ImageIO.read(new java.io.ByteArrayInputStream(result.data())))
+        .extracting(BufferedImage::getWidth, BufferedImage::getHeight)
+        .containsExactly(640, 360);
+  }
+
+  @Test
+  void createsProportionalPortraitPreviewAndDoesNotUpscaleSmallImages() throws Exception {
+    WebpImageWriter writer = new WebpImageWriter();
+
+    WebpImageWriter.EncodedPreview portrait = writer.preview(png(900, 1600), 640, 0.80f, 2_000_000);
+    WebpImageWriter.EncodedPreview small = writer.preview(png(320, 200), 640, 0.80f, 2_000_000);
+
+    assertThat(portrait.width()).isEqualTo(360);
+    assertThat(portrait.height()).isEqualTo(640);
+    assertThat(small.width()).isEqualTo(320);
+    assertThat(small.height()).isEqualTo(200);
+  }
+
+  @Test
+  void createsSquarePreviewAtTheConfiguredLongestEdge() throws Exception {
+    WebpImageWriter.EncodedPreview result = new WebpImageWriter()
+        .preview(png(1200, 1200), 640, 0.80f, 2_000_000);
+
+    assertThat(result.width()).isEqualTo(640);
+    assertThat(result.height()).isEqualTo(640);
+  }
+
+  private static byte[] png(int width, int height) throws Exception {
+    BufferedImage source = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    ImageIO.write(source, "png", output);
+    return output.toByteArray();
+  }
 }

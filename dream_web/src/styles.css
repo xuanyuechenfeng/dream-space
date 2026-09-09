@@ -1862,10 +1862,14 @@ button:disabled {
   color: white;
   background: rgba(255, 255, 255, 0.12);
 }
-.image-preview-download {
+.image-preview-actions {
   position: absolute;
   right: 20px;
   bottom: 20px;
+  display: flex;
+  gap: 8px;
+}
+.image-preview-actions .icon-btn {
   color: white;
   border-color: rgba(255, 255, 255, 0.25);
   background: rgba(255, 255, 255, 0.12);
@@ -2685,13 +2689,21 @@ button:disabled {
   width: min(100%, 560px);
 }
 
-.generation-page .task-output.has-single-result,
+.generation-page .task-output.has-single-result {
+  width: min(100%, 480px);
+}
+
 .generation-page .task-output.has-multiple-results {
-  width: min(100%, 600px);
+  width: min(100%, 560px);
 }
 
 .generation-page .result-grid {
-  max-width: 600px;
+  max-width: 560px;
+}
+
+.generation-page .result-grid.is-single,
+.generation-page .collection-slots.is-single {
+  max-width: 480px;
 }
 
 .generation-page .collection-slots.is-single {
@@ -2727,16 +2739,16 @@ button:disabled {
 .generation-page .collection-slots.is-multi,
 .generation-page .result-grid.is-multi {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  max-width: 600px;
+  max-width: 560px;
   gap: 12px;
 }
 
 .generation-page .result-grid.is-single.is-square {
-  max-width: 480px;
+  max-width: 420px;
 }
 
 .generation-page .collection-slots.is-single.is-square {
-  max-width: 480px;
+  max-width: 420px;
 }
 
 .generation-page .collection-slots.is-multi .collection-slot {
@@ -2747,6 +2759,15 @@ button:disabled {
 .generation-page .collection-slots .result-preview img,
 .generation-page .result-grid .result-preview img {
   background: var(--surface-strong);
+}
+
+.generation-page .result-grid.is-single .result-preview img,
+.generation-page .collection-slots.is-single .result-preview img {
+  width: auto;
+  max-width: 100%;
+  max-height: min(60dvh, 560px);
+  margin-inline: auto;
+  object-fit: contain;
 }
 
 .generation-page .task-input {
